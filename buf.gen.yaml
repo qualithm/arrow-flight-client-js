@@ -8,14 +8,9 @@ inputs:
   - directory: proto
 
 plugins:
-  # Generate TypeScript message types
+  # Generate TypeScript message types and ConnectRPC service stubs
+  # In @bufbuild/protoc-gen-es v2, services are generated automatically
   - local: protoc-gen-es
-    out: src/gen
-    opt:
-      - target=ts
-
-  # Generate ConnectRPC service client stubs
-  - local: protoc-gen-connect-es
     out: src/gen
     opt:
       - target=ts

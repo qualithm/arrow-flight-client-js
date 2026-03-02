@@ -4,14 +4,14 @@
 import { createClient } from "@connectrpc/connect"
 import { createGrpcTransport } from "@connectrpc/connect-node"
 
-import { FlightService } from "../gen/arrow/flight/Flight_connect.js"
-import type {
-  ActionType,
-  FlightDescriptor,
-  FlightInfo,
-  PollInfo,
-  Result,
-  SchemaResult
+import {
+  type ActionType,
+  type FlightDescriptor,
+  type FlightInfo,
+  FlightService,
+  type PollInfo,
+  type Result,
+  type SchemaResult
 } from "../gen/arrow/flight/Flight_pb.js"
 import { FlightConnectionError, FlightError, FlightServerError } from "./errors.js"
 import {
@@ -52,8 +52,7 @@ export class FlightClient {
     this.#options = resolveOptions(options)
 
     const transport = createGrpcTransport({
-      baseUrl: this.#options.url,
-      httpVersion: "2"
+      baseUrl: this.#options.url
     })
 
     this.#client = createClient(FlightService, transport)

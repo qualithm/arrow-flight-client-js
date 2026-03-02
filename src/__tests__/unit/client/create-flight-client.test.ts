@@ -10,11 +10,9 @@ vi.mock("@connectrpc/connect-node", () => ({
 }))
 
 // Mock the generated proto module to avoid @bufbuild/protobuf import issues
-vi.mock("../../../gen/arrow/flight/Flight_connect.js", () => ({
+vi.mock("../../../gen/arrow/flight/Flight_pb.js", () => ({
   FlightService: {}
 }))
-
-vi.mock("../../../gen/arrow/flight/Flight_pb.js", () => ({}))
 
 // Import after mocks are set up
 const { createFlightClient } = await import("../../../client/create-flight-client.js")

@@ -10,11 +10,9 @@ vi.mock("@connectrpc/connect-node", () => ({
 }))
 
 // Mock the generated proto module
-vi.mock("../../../gen/arrow/flight/Flight_connect.js", () => ({
+vi.mock("../../../gen/arrow/flight/Flight_pb.js", () => ({
   FlightService: {}
 }))
-
-vi.mock("../../../gen/arrow/flight/Flight_pb.js", () => ({}))
 
 describe("client barrel exports", () => {
   it("exports all expected symbols", async () => {
