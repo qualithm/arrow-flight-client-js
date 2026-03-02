@@ -51,6 +51,7 @@
     "docs": "typedoc",
     "format:fix": "prettier --write .",
     "format": "prettier --check .",
+    "generate:proto": "buf generate",
     "lint:fix": "eslint --fix .",
     "lint": "eslint .",
     "prepublishOnly": "bun run clean && bun run build",
@@ -63,8 +64,15 @@
     "test": "vitest run src/__tests__/unit",
     "typecheck": "tsc -p tsconfig.node.json --noEmit"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@bufbuild/protobuf": "^2.11.0",
+    "@connectrpc/connect": "^1",
+    "@connectrpc/connect-node": "^1"
+  },
   "devDependencies": {
+    "@bufbuild/buf": "^1.66.0",
+    "@bufbuild/protoc-gen-es": "^2.11.0",
+    "@connectrpc/protoc-gen-connect-es": "^1.7.0",
     "@eslint/js": "10.0.1",
     "@types/bun": "1.3.9",
     "@vitest/coverage-v8": "^4.0.18",

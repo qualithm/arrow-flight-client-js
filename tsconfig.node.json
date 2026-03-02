@@ -13,9 +13,16 @@
     "skipLibCheck": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["eslint*.config.ts", "vitest.config.ts", "src", "scripts", "bench", "examples"]
+  "include": [
+    "eslint*.config.ts",
+    "vitest.config.ts",
+    "scripts",
+    "bench",
+    "examples",
+    "src/**/*.ts"
+  ],
+  "exclude": ["src/gen/**"]
 }
