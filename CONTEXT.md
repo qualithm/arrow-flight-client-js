@@ -57,12 +57,12 @@ for Apache Arrow Flight and Flight SQL protocols.
 
 ### Features
 
-| Feature            | Status      | Notes                                                    |
-| ------------------ | ----------- | -------------------------------------------------------- |
-| Flight RPC methods | In progress | FlightClient base + unit tests (82 tests, 92%+ coverage) |
-| Flight SQL         | Not started | —                                                        |
-| Arrow IPC          | Not started | —                                                        |
-| Authentication     | Not started | Headers supported; auth patterns pending                 |
+| Feature            | Status      | Notes                                                     |
+| ------------------ | ----------- | --------------------------------------------------------- |
+| Flight RPC methods | In progress | FlightClient base + unit tests (104 tests, 92%+ coverage) |
+| Flight SQL         | Not started | —                                                         |
+| Arrow IPC          | Not started | —                                                         |
+| Authentication     | Implemented | Bearer tokens, mTLS (TLS options), Handshake (BasicAuth)  |
 
 ---
 
@@ -119,7 +119,7 @@ for Apache Arrow Flight and Flight SQL protocols.
 - [x] Vendor Flight.proto and FlightSql.proto from apache/arrow
 - [x] Set up buf code generation with ConnectRPC
 - [x] Implement FlightClient base class with connection management
-- [ ] Implement authentication (Bearer tokens, mTLS, Handshake)
+- [x] Implement authentication (Bearer tokens, mTLS, Handshake)
 - [ ] Implement Arrow IPC stream encoding/decoding
 
 Acceptance: All core Flight RPC methods operational against a test server
@@ -139,10 +139,12 @@ Acceptance: All Flight SQL commands and actions functional
 
 > Append-only. Never edit or delete existing entries.
 
-| Date       | Learning                                                                                           |
-| ---------- | -------------------------------------------------------------------------------------------------- |
-| 2026-03-02 | Vendored protos at commit aae49e8ba2; FlightSql.proto imports Flight.proto via package path        |
-| 2026-03-02 | Generated proto code excluded from eslint and tsconfig.node.json (uses enums, @ts-nocheck)         |
-| 2026-03-02 | ConnectRPC v1.7.0 required; codegen and runtime versions must match (protoc-gen-connect-es)        |
-| 2026-03-02 | Removed erasableSyntaxOnly from tsconfig.node.json; generated code uses enums incompatible with it |
-| 2026-03-02 | FlightClient tests use vi.mock for ConnectRPC and generated proto modules to avoid network calls   |
+| Date       | Learning                                                                                                                                  |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-03-02 | Vendored protos at commit aae49e8ba2; FlightSql.proto imports Flight.proto via package path                                               |
+| 2026-03-02 | Generated proto code excluded from eslint and tsconfig.node.json (uses enums, @ts-nocheck)                                                |
+| 2026-03-02 | ConnectRPC v1.7.0 required; codegen and runtime versions must match (protoc-gen-connect-es)                                               |
+| 2026-03-02 | Removed erasableSyntaxOnly from tsconfig.node.json; generated code uses enums incompatible with it                                        |
+| 2026-03-02 | FlightClient tests use vi.mock for ConnectRPC and generated proto modules to avoid network calls                                          |
+| 2026-03-03 | Authentication uses three patterns: Bearer (via headers), mTLS (via nodeOptions), Handshake (BasicAuth proto via bidirectional streaming) |
+| 2026-03-03 | gRPC transport doesn't need httpVersion parameter; createGrpcTransport always uses HTTP/2                                                 |

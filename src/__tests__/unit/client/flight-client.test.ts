@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { FlightConnectionError, FlightError, FlightServerError } from "../../../client/errors.js"
+import {
+  FlightAuthError,
+  FlightConnectionError,
+  FlightError,
+  FlightServerError
+} from "../../../client/errors.js"
 
 // Create mock implementations
 const mockGetFlightInfo = vi.fn()
@@ -10,6 +15,7 @@ const mockListFlights = vi.fn()
 const mockListActions = vi.fn()
 const mockDoAction = vi.fn()
 const mockDoGet = vi.fn()
+const mockHandshake = vi.fn()
 
 const mockCreateClient = vi.fn(() => ({
   getFlightInfo: mockGetFlightInfo,
@@ -18,8 +24,11 @@ const mockCreateClient = vi.fn(() => ({
   listFlights: mockListFlights,
   listActions: mockListActions,
   doAction: mockDoAction,
-  doGet: mockDoGet
+  doGet: mockDoGet,
+  handshake: mockHandshake
 }))
+
+const mockCreateGrpcTransport = vi.fn(() => ({}))
 
 // Mock the ConnectRPC modules to avoid network calls
 vi.mock("@connectrpc/connect", () => ({
@@ -27,12 +36,19 @@ vi.mock("@connectrpc/connect", () => ({
 }))
 
 vi.mock("@connectrpc/connect-node", () => ({
-  createGrpcTransport: vi.fn(() => ({}))
+  createGrpcTransport: mockCreateGrpcTransport
+}))
+
+// Mock @bufbuild/protobuf for message creation
+vi.mock("@bufbuild/protobuf", () => ({
+  create: vi.fn((_schema, init) => init),
+  toBinary: vi.fn(() => new Uint8Array([1, 2, 3]))
 }))
 
 // Mock the generated proto module to avoid @bufbuild/protobuf import issues
 vi.mock("../../../gen/arrow/flight/Flight_pb.js", () => ({
-  FlightService: {}
+  FlightService: {},
+  BasicAuthSchema: {}
 }))
 
 // Import after mocks are set up
@@ -220,6 +236,16 @@ describe("FlightClient", () => {
 
       expect(result).toBe(mockPollInfo)
     })
+
+    it("wraps errors as FlightError", async () => {
+      mockPollFlightInfo.mockRejectedValue(new Error("network error"))
+
+      const client = new FlightClient({ url: "http://localhost:8815" })
+
+      await expect(client.pollFlightInfo({ type: "path", path: ["test"] })).rejects.toThrow(
+        FlightError
+      )
+    })
   })
 
   describe("getSchema", () => {
@@ -240,6 +266,16 @@ describe("FlightClient", () => {
       const result = await client.getSchema({ type: "path", path: ["dataset"] })
 
       expect(result).toBe(mockSchema)
+    })
+
+    it("wraps errors as FlightError", async () => {
+      mockGetSchema.mockRejectedValue(new Error("network error"))
+
+      const client = new FlightClient({ url: "http://localhost:8815" })
+
+      await expect(client.getSchema({ type: "path", path: ["dataset"] })).rejects.toThrow(
+        FlightError
+      )
     })
   })
 
@@ -294,6 +330,16 @@ describe("FlightClient", () => {
         expect.objectContaining({})
       )
     })
+
+    it("wraps errors as FlightError", async () => {
+      mockListFlights.mockImplementation(() => {
+        throw new Error("network error")
+      })
+
+      const client = new FlightClient({ url: "http://localhost:8815" })
+
+      await expect(client.listFlights()[Symbol.asyncIterator]().next()).rejects.toThrow(FlightError)
+    })
   })
 
   describe("listActions", () => {
@@ -318,6 +364,16 @@ describe("FlightClient", () => {
       }
 
       expect(results).toEqual(actions)
+    })
+
+    it("wraps errors as FlightError", async () => {
+      mockListActions.mockImplementation(() => {
+        throw new Error("network error")
+      })
+
+      const client = new FlightClient({ url: "http://localhost:8815" })
+
+      await expect(client.listActions()[Symbol.asyncIterator]().next()).rejects.toThrow(FlightError)
     })
   })
 
@@ -375,6 +431,18 @@ describe("FlightClient", () => {
         expect.objectContaining({})
       )
     })
+
+    it("wraps errors as FlightError", async () => {
+      mockDoAction.mockImplementation(() => {
+        throw new Error("network error")
+      })
+
+      const client = new FlightClient({ url: "http://localhost:8815" })
+
+      await expect(
+        client.doAction({ type: "test" })[Symbol.asyncIterator]().next()
+      ).rejects.toThrow(FlightError)
+    })
   })
 
   describe("doGet", () => {
@@ -402,6 +470,346 @@ describe("FlightClient", () => {
       }
 
       expect(collected).toEqual([new Uint8Array([1, 2]), new Uint8Array([3, 4])])
+    })
+
+    it("wraps errors as FlightError", async () => {
+      mockDoGet.mockImplementation(() => {
+        throw new Error("network error")
+      })
+
+      const client = new FlightClient({ url: "http://localhost:8815" })
+      const iterable = client.doGet({ ticket: new Uint8Array([1]) })
+
+      await expect(iterable[Symbol.asyncIterator]().next()).rejects.toThrow(FlightError)
+    })
+  })
+
+  describe("authenticated getter", () => {
+    it("returns false initially", () => {
+      const client = new FlightClient({ url: "http://localhost:8815" })
+
+      expect(client.authenticated).toBe(false)
+    })
+  })
+
+  describe("handshake", () => {
+    it("throws FlightError when client is closed", async () => {
+      const client = new FlightClient({
+        url: "http://localhost:8815",
+        auth: { type: "basic", credentials: { username: "user", password: "pass" } }
+      })
+      client.close()
+
+      await expect(client.handshake()).rejects.toThrow("client is closed")
+    })
+
+    it("throws FlightError when no payload and no basic auth configured", async () => {
+      const client = new FlightClient({ url: "http://localhost:8815" })
+
+      await expect(client.handshake()).rejects.toThrow(
+        "no handshake payload provided and no basic auth credentials configured"
+      )
+    })
+
+    it("performs handshake with basic auth credentials", async () => {
+      const tokenBytes = new TextEncoder().encode("test-token")
+      mockHandshake.mockReturnValue(asyncIterable([{ protocolVersion: 0n, payload: tokenBytes }]))
+
+      const client = new FlightClient({
+        url: "http://localhost:8815",
+        auth: { type: "basic", credentials: { username: "user", password: "pass" } }
+      })
+
+      const token = await client.handshake()
+
+      expect(token).toBe("test-token")
+      expect(client.authenticated).toBe(true)
+      expect(mockHandshake).toHaveBeenCalled()
+    })
+
+    it("performs handshake with custom payload", async () => {
+      const tokenBytes = new TextEncoder().encode("custom-token")
+      mockHandshake.mockReturnValue(asyncIterable([{ protocolVersion: 0n, payload: tokenBytes }]))
+
+      const client = new FlightClient({ url: "http://localhost:8815" })
+      const customPayload = new Uint8Array([1, 2, 3, 4])
+
+      const token = await client.handshake(customPayload)
+
+      expect(token).toBe("custom-token")
+      expect(client.authenticated).toBe(true)
+    })
+
+    it("throws FlightAuthError when no response from server", async () => {
+      mockHandshake.mockReturnValue(asyncIterable([]))
+
+      const client = new FlightClient({
+        url: "http://localhost:8815",
+        auth: { type: "basic", credentials: { username: "user", password: "pass" } }
+      })
+
+      await expect(client.handshake()).rejects.toThrow(FlightAuthError)
+      await expect(client.handshake()).rejects.toThrow("handshake failed: no response from server")
+    })
+
+    it("wraps errors as FlightError", async () => {
+      mockHandshake.mockImplementation(() => {
+        throw new Error("network error")
+      })
+
+      const client = new FlightClient({
+        url: "http://localhost:8815",
+        auth: { type: "basic", credentials: { username: "user", password: "pass" } }
+      })
+
+      await expect(client.handshake()).rejects.toThrow(FlightError)
+    })
+  })
+
+  describe("authenticate", () => {
+    it("throws FlightError when client is closed", async () => {
+      const client = new FlightClient({ url: "http://localhost:8815" })
+      client.close()
+
+      await expect(client.authenticate()).rejects.toThrow("client is closed")
+    })
+
+    it("calls handshake for basic auth", async () => {
+      const tokenBytes = new TextEncoder().encode("auth-token")
+      mockHandshake.mockReturnValue(asyncIterable([{ protocolVersion: 0n, payload: tokenBytes }]))
+
+      const client = new FlightClient({
+        url: "http://localhost:8815",
+        auth: { type: "basic", credentials: { username: "user", password: "pass" } }
+      })
+
+      const token = await client.authenticate()
+
+      expect(token).toBe("auth-token")
+      expect(client.authenticated).toBe(true)
+    })
+
+    it("returns token and sets authenticated for bearer auth", async () => {
+      const client = new FlightClient({
+        url: "http://localhost:8815",
+        auth: { type: "bearer", token: "my-bearer-token" }
+      })
+
+      const token = await client.authenticate()
+
+      expect(token).toBe("my-bearer-token")
+      expect(client.authenticated).toBe(true)
+    })
+
+    it("returns undefined when no auth configured", async () => {
+      const client = new FlightClient({ url: "http://localhost:8815" })
+
+      const token = await client.authenticate()
+
+      expect(token).toBeUndefined()
+    })
+  })
+
+  describe("authentication headers", () => {
+    it("includes auth token in requests after handshake", async () => {
+      const tokenBytes = new TextEncoder().encode("session-token")
+      mockHandshake.mockReturnValue(asyncIterable([{ protocolVersion: 0n, payload: tokenBytes }]))
+      mockGetFlightInfo.mockResolvedValue({ flightDescriptor: {} })
+
+      const client = new FlightClient({
+        url: "http://localhost:8815",
+        auth: { type: "basic", credentials: { username: "user", password: "pass" } }
+      })
+
+      await client.handshake()
+      await client.getFlightInfo({ type: "path", path: ["test"] })
+
+      expect(mockGetFlightInfo).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: "Bearer session-token"
+          })
+        })
+      )
+    })
+
+    it("includes bearer token in requests without handshake", async () => {
+      mockGetFlightInfo.mockResolvedValue({ flightDescriptor: {} })
+
+      const client = new FlightClient({
+        url: "http://localhost:8815",
+        auth: { type: "bearer", token: "my-token" }
+      })
+
+      await client.getFlightInfo({ type: "path", path: ["test"] })
+
+      expect(mockGetFlightInfo).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: "Bearer my-token"
+          })
+        })
+      )
+    })
+
+    it("preserves custom headers alongside auth", async () => {
+      mockGetFlightInfo.mockResolvedValue({ flightDescriptor: {} })
+
+      const client = new FlightClient({
+        url: "http://localhost:8815",
+        headers: { "X-Custom": "value" },
+        auth: { type: "bearer", token: "my-token" }
+      })
+
+      await client.getFlightInfo({ type: "path", path: ["test"] })
+
+      expect(mockGetFlightInfo).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            "X-Custom": "value",
+            Authorization: "Bearer my-token"
+          })
+        })
+      )
+    })
+  })
+
+  describe("error handling for auth errors", () => {
+    it("wraps UNAUTHENTICATED errors as FlightAuthError", async () => {
+      const authError = Object.assign(new Error("unauthenticated"), {
+        code: "UNAUTHENTICATED"
+      })
+      mockGetFlightInfo.mockRejectedValue(authError)
+
+      const client = new FlightClient({ url: "http://localhost:8815" })
+
+      await expect(client.getFlightInfo({ type: "path", path: ["test"] })).rejects.toThrow(
+        FlightAuthError
+      )
+    })
+
+    it("wraps PERMISSION_DENIED errors as FlightAuthError", async () => {
+      const authError = Object.assign(new Error("permission denied"), {
+        code: "PERMISSION_DENIED"
+      })
+      mockGetFlightInfo.mockRejectedValue(authError)
+
+      const client = new FlightClient({ url: "http://localhost:8815" })
+
+      await expect(client.getFlightInfo({ type: "path", path: ["test"] })).rejects.toThrow(
+        FlightAuthError
+      )
+    })
+  })
+
+  describe("TLS configuration", () => {
+    it("passes TLS cert and key to transport", () => {
+      new FlightClient({
+        url: "https://flight.example.com",
+        tls: {
+          cert: "cert-data",
+          key: "key-data"
+        }
+      })
+
+      expect(mockCreateGrpcTransport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          nodeOptions: expect.objectContaining({
+            cert: "cert-data",
+            key: "key-data"
+          })
+        })
+      )
+    })
+
+    it("passes TLS ca to transport", () => {
+      new FlightClient({
+        url: "https://flight.example.com",
+        tls: {
+          ca: "ca-data"
+        }
+      })
+
+      expect(mockCreateGrpcTransport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          nodeOptions: expect.objectContaining({
+            ca: "ca-data"
+          })
+        })
+      )
+    })
+
+    it("passes TLS passphrase to transport", () => {
+      new FlightClient({
+        url: "https://flight.example.com",
+        tls: {
+          passphrase: "secret"
+        }
+      })
+
+      expect(mockCreateGrpcTransport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          nodeOptions: expect.objectContaining({
+            passphrase: "secret"
+          })
+        })
+      )
+    })
+
+    it("passes TLS rejectUnauthorized to transport", () => {
+      new FlightClient({
+        url: "https://flight.example.com",
+        tls: {
+          rejectUnauthorized: false
+        }
+      })
+
+      expect(mockCreateGrpcTransport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          nodeOptions: expect.objectContaining({
+            rejectUnauthorized: false
+          })
+        })
+      )
+    })
+
+    it("ignores empty passphrase", () => {
+      new FlightClient({
+        url: "https://flight.example.com",
+        tls: {
+          passphrase: ""
+        }
+      })
+
+      expect(mockCreateGrpcTransport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          nodeOptions: expect.not.objectContaining({
+            passphrase: ""
+          })
+        })
+      )
+    })
+
+    it("merges nodeOptions with TLS options", () => {
+      new FlightClient({
+        url: "https://flight.example.com",
+        nodeOptions: { timeout: 5000 },
+        tls: {
+          cert: "cert-data"
+        }
+      })
+
+      expect(mockCreateGrpcTransport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          nodeOptions: expect.objectContaining({
+            timeout: 5000,
+            cert: "cert-data"
+          })
+        })
+      )
     })
   })
 })

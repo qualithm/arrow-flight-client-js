@@ -1,19 +1,22 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 // Disabled due to generated proto types using @ts-nocheck
 
+import { create, toBinary } from "@bufbuild/protobuf"
 import { createClient } from "@connectrpc/connect"
 import { createGrpcTransport } from "@connectrpc/connect-node"
 
 import {
   type ActionType,
+  BasicAuthSchema,
   type FlightDescriptor,
   type FlightInfo,
   FlightService,
+  type HandshakeResponse,
   type PollInfo,
   type Result,
   type SchemaResult
 } from "../gen/arrow/flight/Flight_pb.js"
-import { FlightConnectionError, FlightError, FlightServerError } from "./errors.js"
+import { FlightAuthError, FlightConnectionError, FlightError, FlightServerError } from "./errors.js"
 import {
   type FlightAction,
   type FlightClientOptions,
@@ -47,12 +50,18 @@ export class FlightClient {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Generated proto types use @ts-nocheck
   readonly #client: any
   #closed = false
+  #authenticated = false
+  #authToken: string | undefined
 
   constructor(options: FlightClientOptions) {
     this.#options = resolveOptions(options)
 
+    // Build node options with TLS configuration if provided
+    const nodeOptions = this.#buildNodeOptions()
+
     const transport = createGrpcTransport({
-      baseUrl: this.#options.url
+      baseUrl: this.#options.url,
+      nodeOptions
     })
 
     this.#client = createClient(FlightService, transport)
@@ -73,11 +82,112 @@ export class FlightClient {
   }
 
   /**
+   * Whether the client has been authenticated via handshake.
+   */
+  get authenticated(): boolean {
+    return this.#authenticated
+  }
+
+  /**
    * Close the client and release resources.
    * After calling close, the client should not be used.
    */
   close(): void {
     this.#closed = true
+  }
+
+  /**
+   * Perform Flight Handshake authentication.
+   *
+   * This method is automatically called for clients configured with `auth: { type: "basic" }`.
+   * For custom handshake payloads, call this method directly with raw bytes.
+   *
+   * @param payload - Raw handshake payload (defaults to BasicAuth if auth.type is "basic")
+   * @returns The authentication token from the server
+   */
+  async handshake(payload?: Uint8Array): Promise<string> {
+    this.#assertOpen()
+
+    // Use provided payload or build from basic auth credentials
+    let handshakePayload = payload
+    if (!handshakePayload && this.#options.auth?.type === "basic") {
+      const basicAuth = create(BasicAuthSchema, {
+        username: this.#options.auth.credentials.username,
+        password: this.#options.auth.credentials.password
+      })
+      handshakePayload = toBinary(BasicAuthSchema, basicAuth)
+    }
+
+    if (!handshakePayload) {
+      throw new FlightError(
+        "no handshake payload provided and no basic auth credentials configured"
+      )
+    }
+
+    try {
+      // Create async iterable with single handshake request
+      // eslint-disable-next-line @typescript-eslint/require-await
+      const requests = async function* (): AsyncGenerator<
+        { protocolVersion: bigint; payload: Uint8Array },
+        void,
+        unknown
+      > {
+        yield {
+          protocolVersion: 0n,
+          payload: handshakePayload
+        }
+      }
+
+      const stream = this.#client.handshake(requests(), {
+        headers: this.#getRequestHeaders()
+      })
+
+      let response: HandshakeResponse | undefined
+      for await (const msg of stream) {
+        response = msg
+        break // Only need first response
+      }
+
+      if (!response) {
+        throw new FlightAuthError("handshake failed: no response from server")
+      }
+
+      // Extract token from response payload (typically Bearer token)
+      const token = new TextDecoder().decode(response.payload)
+      this.#authToken = token
+      this.#authenticated = true
+
+      return token
+    } catch (error) {
+      if (FlightError.isError(error)) {
+        throw error
+      }
+      throw this.#wrapError(error, "handshake")
+    }
+  }
+
+  /**
+   * Authenticate with the server using configured credentials.
+   *
+   * For basic auth, this calls the Handshake RPC.
+   * For bearer auth, no action is needed (token is sent in headers).
+   *
+   * @returns The authentication token (if applicable)
+   */
+  async authenticate(): Promise<string | undefined> {
+    this.#assertOpen()
+
+    if (this.#options.auth?.type === "basic") {
+      return this.handshake()
+    }
+
+    if (this.#options.auth?.type === "bearer") {
+      this.#authenticated = true
+      return this.#options.auth.token
+    }
+
+    // No auth configured
+    return undefined
   }
 
   /**
@@ -87,7 +197,7 @@ export class FlightClient {
     this.#assertOpen()
     try {
       return await this.#client.getFlightInfo(this.#toFlightDescriptor(descriptor), {
-        headers: this.#options.headers
+        headers: this.#getRequestHeaders()
       })
     } catch (error) {
       throw this.#wrapError(error, "getFlightInfo")
@@ -101,7 +211,7 @@ export class FlightClient {
     this.#assertOpen()
     try {
       return await this.#client.pollFlightInfo(this.#toFlightDescriptor(descriptor), {
-        headers: this.#options.headers
+        headers: this.#getRequestHeaders()
       })
     } catch (error) {
       throw this.#wrapError(error, "pollFlightInfo")
@@ -115,7 +225,7 @@ export class FlightClient {
     this.#assertOpen()
     try {
       return await this.#client.getSchema(this.#toFlightDescriptor(descriptor), {
-        headers: this.#options.headers
+        headers: this.#getRequestHeaders()
       })
     } catch (error) {
       throw this.#wrapError(error, "getSchema")
@@ -130,7 +240,7 @@ export class FlightClient {
     try {
       const stream = this.#client.listFlights(
         { expression: criteria?.expression ?? new Uint8Array() },
-        { headers: this.#options.headers }
+        { headers: this.#getRequestHeaders() }
       )
       for await (const info of stream) {
         yield info
@@ -146,7 +256,7 @@ export class FlightClient {
   async *listActions(): AsyncIterable<ActionType> {
     this.#assertOpen()
     try {
-      const stream = this.#client.listActions({}, { headers: this.#options.headers })
+      const stream = this.#client.listActions({}, { headers: this.#getRequestHeaders() })
       for await (const action of stream) {
         yield action
       }
@@ -163,7 +273,7 @@ export class FlightClient {
     try {
       const stream = this.#client.doAction(
         { type: action.type, body: action.body ?? new Uint8Array() },
-        { headers: this.#options.headers }
+        { headers: this.#getRequestHeaders() }
       )
       for await (const result of stream) {
         yield result
@@ -184,7 +294,7 @@ export class FlightClient {
     this.#assertOpen()
     try {
       const stream = this.#client.doGet(ticket, {
-        headers: this.#options.headers
+        headers: this.#getRequestHeaders()
       })
       for await (const data of stream) {
         // Return the raw data body for downstream IPC decoding
@@ -210,6 +320,43 @@ export class FlightClient {
     return { type: 2, cmd: input.cmd } // CMD = 2
   }
 
+  #buildNodeOptions(): Record<string, unknown> {
+    const nodeOptions: Record<string, unknown> = { ...this.#options.nodeOptions }
+
+    // Apply TLS options if configured
+    if (this.#options.tls) {
+      const { tls } = this.#options
+      if (tls.cert !== undefined) {
+        nodeOptions.cert = tls.cert
+      }
+      if (tls.key !== undefined) {
+        nodeOptions.key = tls.key
+      }
+      if (tls.ca !== undefined) {
+        nodeOptions.ca = tls.ca
+      }
+      if (tls.passphrase !== undefined && tls.passphrase !== "") {
+        nodeOptions.passphrase = tls.passphrase
+      }
+      if (tls.rejectUnauthorized !== undefined) {
+        nodeOptions.rejectUnauthorized = tls.rejectUnauthorized
+      }
+    }
+
+    return nodeOptions
+  }
+
+  #getRequestHeaders(): Record<string, string> {
+    const headers: Record<string, string> = { ...this.#options.headers }
+
+    // Add auth token if authenticated via handshake
+    if (this.#authToken !== undefined && this.#authToken !== "") {
+      headers.Authorization = `Bearer ${this.#authToken}`
+    }
+
+    return headers
+  }
+
   #wrapError(error: unknown, operation: string): FlightError {
     if (FlightError.isError(error)) {
       return error
@@ -218,6 +365,12 @@ export class FlightClient {
     // Handle ConnectRPC errors
     if (error instanceof Error && "code" in error) {
       const connectError = error as Error & { code: string; rawMessage?: string }
+
+      // Check for authentication-related errors
+      if (connectError.code === "UNAUTHENTICATED" || connectError.code === "PERMISSION_DENIED") {
+        return new FlightAuthError(`${operation} failed: ${connectError.message}`, error)
+      }
+
       return new FlightServerError(
         `${operation} failed: ${connectError.message}`,
         connectError.code,

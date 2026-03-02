@@ -9,9 +9,16 @@ vi.mock("@connectrpc/connect-node", () => ({
   createGrpcTransport: vi.fn(() => ({}))
 }))
 
+// Mock @bufbuild/protobuf for message creation
+vi.mock("@bufbuild/protobuf", () => ({
+  create: vi.fn((_schema, init) => init),
+  toBinary: vi.fn(() => new Uint8Array([1, 2, 3]))
+}))
+
 // Mock the generated proto module to avoid @bufbuild/protobuf import issues
 vi.mock("../../../gen/arrow/flight/Flight_pb.js", () => ({
-  FlightService: {}
+  FlightService: {},
+  BasicAuthSchema: {}
 }))
 
 // Import after mocks are set up

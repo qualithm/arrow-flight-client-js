@@ -14,11 +14,14 @@ export {
 
 // Types
 export type {
+  AuthOptions,
+  BasicAuthCredentials,
   FlightAction,
   FlightClientOptions,
   FlightCriteria,
   FlightDescriptorInput,
   FlightTicket,
-  ResolvedFlightClientOptions
+  ResolvedFlightClientOptions,
+  TlsOptions
 } from "./types.js"
 export { DEFAULT_TIMEOUT_MS } from "./types.js"
