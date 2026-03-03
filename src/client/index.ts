@@ -1,6 +1,15 @@
 // Client
 export { createFlightClient } from "./create-flight-client.js"
+export { createFlightSqlClient } from "./create-flight-sql-client.js"
 export { FlightClient } from "./flight-client.js"
+export type {
+  ExecuteQueryOptions,
+  ExecuteUpdateOptions,
+  PreparedStatement,
+  Transaction,
+  UpdateResult
+} from "./flight-sql-client.js"
+export { FlightSqlClient } from "./flight-sql-client.js"
 
 // Errors
 export {

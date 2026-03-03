@@ -37,11 +37,11 @@ for Apache Arrow Flight and Flight SQL protocols.
 
 ### Modules
 
-| Module     | Purpose                                         |
-| ---------- | ----------------------------------------------- |
-| `index.ts` | Main entry point                                |
-| `client/`  | FlightClient, errors, types, factory, IPC utils |
-| `greet.ts` | Greeting utility (legacy, to be removed)        |
+| Module     | Purpose                                                          |
+| ---------- | ---------------------------------------------------------------- |
+| `index.ts` | Main entry point                                                 |
+| `client/`  | FlightClient, FlightSqlClient, errors, types, factory, IPC utils |
+| `greet.ts` | Greeting utility (legacy, to be removed)                         |
 
 ### File Structure
 
@@ -57,12 +57,12 @@ for Apache Arrow Flight and Flight SQL protocols.
 
 ### Features
 
-| Feature            | Status      | Notes                                                        |
-| ------------------ | ----------- | ------------------------------------------------------------ |
-| Flight RPC methods | In progress | FlightClient base + doGet/doPut (133 tests)                  |
-| Flight SQL         | Not started | —                                                            |
-| Arrow IPC          | Implemented | Encode/decode via apache-arrow; tableFromArrays, RecordBatch |
-| Authentication     | Implemented | Bearer tokens, mTLS (TLS options), Handshake (BasicAuth)     |
+| Feature            | Status      | Notes                                                         |
+| ------------------ | ----------- | ------------------------------------------------------------- |
+| Flight RPC methods | Implemented | FlightClient base + doGet/doPut (133 tests)                   |
+| Flight SQL         | Implemented | Query, prepared statements, transactions, metadata (31 tests) |
+| Arrow IPC          | Implemented | Encode/decode via apache-arrow; tableFromArrays, RecordBatch  |
+| Authentication     | Implemented | Bearer tokens, mTLS (TLS options), Handshake (BasicAuth)      |
 
 ---
 
@@ -83,6 +83,8 @@ for Apache Arrow Flight and Flight SQL protocols.
 9. **Factory functions** — Provide `createFlightClient()` and `createFlightSqlClient()` alongside
    class constructors
 10. **Static error helpers** — Error classes include static `isError()` methods for type narrowing
+11. **Composition for FlightSqlClient** — FlightSqlClient wraps FlightClient via composition (not
+    inheritance) for flexibility
 
 ---
 
@@ -90,9 +92,8 @@ for Apache Arrow Flight and Flight SQL protocols.
 
 ### Open Decisions
 
-| ID   | Question                                        | Context                                                              |
-| ---- | ----------------------------------------------- | -------------------------------------------------------------------- |
-| OD-1 | Inheritance or composition for FlightSqlClient? | Inheritance simpler; composition more flexible for future extensions |
+| ID  | Question | Context |
+| --- | -------- | ------- |
 
 ### Risks
 
@@ -126,10 +127,10 @@ Acceptance: All core Flight RPC methods operational against a test server
 
 ### Flight SQL
 
-- [ ] Implement SQL query execution
-- [ ] Implement prepared statement management
-- [ ] Implement transaction support
-- [ ] Implement database metadata queries
+- [x] Implement SQL query execution
+- [x] Implement prepared statement management
+- [x] Implement transaction support
+- [x] Implement database metadata queries
 
 Acceptance: All Flight SQL commands and actions functional
 
@@ -149,3 +150,4 @@ Acceptance: All Flight SQL commands and actions functional
 | 2026-03-03 | Authentication uses three patterns: Bearer (via headers), mTLS (via nodeOptions), Handshake (BasicAuth proto via bidirectional streaming) |
 | 2026-03-03 | gRPC transport doesn't need httpVersion parameter; createGrpcTransport always uses HTTP/2                                                 |
 | 2026-03-03 | Arrow IPC via apache-arrow v21: use tableFromArrays for test data; RecordBatchReader.from returns sync reader for Uint8Array input        |
+| 2026-03-03 | FlightSqlClient uses composition over inheritance; wraps FlightClient and delegates core RPC operations                                   |
