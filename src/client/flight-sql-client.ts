@@ -44,6 +44,134 @@ const FLIGHT_SQL_ACTIONS = {
 } as const
 
 /**
+ * Flight SQL type URL prefix for protobuf Any encoding.
+ */
+const TYPE_URL_PREFIX = "type.googleapis.com/arrow.flight.protocol.sql"
+
+/**
+ * Encodes a Flight SQL command as a protobuf Any message.
+ *
+ * Flight SQL commands must be wrapped in an Any message with a type_url
+ * that identifies the command type. The server uses this to dispatch
+ * to the correct handler.
+ *
+ * @param typeName - The command type name (e.g., "CommandStatementQuery")
+ * @param data - The serialised command bytes
+ * @returns The encoded Any message as Uint8Array
+ */
+function packAny(typeName: string, data: Uint8Array): Uint8Array {
+  const typeUrl = `${TYPE_URL_PREFIX}.${typeName}`
+  const typeUrlBytes = new TextEncoder().encode(typeUrl)
+  const typeUrlLen = typeUrlBytes.length
+  const dataLen = data.length
+
+  // Calculate varint sizes
+  const typeUrlVarIntSize = varIntSize(typeUrlLen)
+  const dataVarIntSize = varIntSize(dataLen)
+
+  // Total size: 1 (tag) + varint + typeUrl + 1 (tag) + varint + data
+  const totalSize = 1 + typeUrlVarIntSize + typeUrlLen + 1 + dataVarIntSize + dataLen
+  const buffer = new Uint8Array(totalSize)
+
+  let offset = 0
+
+  // Field 1: type_url (tag = 0x0a = field 1, wire type 2)
+  buffer[offset++] = 0x0a
+  offset = writeVarInt(buffer, offset, typeUrlLen)
+  buffer.set(typeUrlBytes, offset)
+  offset += typeUrlLen
+
+  // Field 2: value (tag = 0x12 = field 2, wire type 2)
+  buffer[offset++] = 0x12
+  offset = writeVarInt(buffer, offset, dataLen)
+  buffer.set(data, offset)
+
+  return buffer
+}
+
+/**
+ * Calculates the size of a varint encoding.
+ */
+function varIntSize(value: number): number {
+  let size = 1
+  while (value >= 0x80) {
+    value >>>= 7
+    size++
+  }
+  return size
+}
+
+/**
+ * Writes a varint to a Uint8Array.
+ */
+function writeVarInt(buffer: Uint8Array, offset: number, value: number): number {
+  while (value >= 0x80) {
+    buffer[offset++] = (value & 0x7f) | 0x80
+    value >>>= 7
+  }
+  buffer[offset++] = value
+  return offset
+}
+
+/**
+ * Reads a varint from a Uint8Array.
+ * Returns [value, newOffset].
+ */
+function readVarInt(buffer: Uint8Array, offset: number): [number, number] {
+  let value = 0
+  let shift = 0
+  while (offset < buffer.length) {
+    const byte = buffer[offset++]
+    value |= (byte & 0x7f) << shift
+    if ((byte & 0x80) === 0) {
+      break
+    }
+    shift += 7
+  }
+  return [value, offset]
+}
+
+/**
+ * Unpacks a protobuf Any message and returns the inner value.
+ *
+ * The Any message format is:
+ * - Field 1 (type_url): string
+ * - Field 2 (value): bytes
+ *
+ * @param data - The Any-encoded message
+ * @returns The inner value bytes
+ */
+function unpackAny(data: Uint8Array): Uint8Array {
+  let offset = 0
+
+  while (offset < data.length) {
+    const tag = data[offset++]
+    const fieldNumber = tag >>> 3
+    const wireType = tag & 0x07
+
+    if (wireType === 2) {
+      // Length-delimited field
+      const [length, newOffset] = readVarInt(data, offset)
+      offset = newOffset
+
+      if (fieldNumber === 2) {
+        // This is the value field - return it
+        return data.slice(offset, offset + length)
+      }
+
+      // Skip this field (e.g., type_url)
+      offset += length
+    } else {
+      // Unknown wire type - shouldn't happen for Any
+      break
+    }
+  }
+
+  // No value field found - return original data (not wrapped in Any)
+  return data
+}
+
+/**
  * Options for executing a SQL query.
  */
 export type ExecuteQueryOptions = {
@@ -260,8 +388,11 @@ export class FlightSqlClient {
       transactionId: options?.transactionId
     })
 
-    // Serialize command to bytes
-    const cmdBytes = toBinary(CommandStatementQuerySchema, command)
+    // Serialize command to bytes (wrapped in protobuf Any)
+    const cmdBytes = packAny(
+      "CommandStatementQuery",
+      toBinary(CommandStatementQuerySchema, command)
+    )
 
     // Get flight info for the query
     const descriptor: FlightDescriptorInput = { type: "cmd", cmd: cmdBytes }
@@ -295,7 +426,10 @@ export class FlightSqlClient {
       query,
       transactionId: options?.transactionId
     })
-    const cmdBytes = toBinary(CommandStatementQuerySchema, command)
+    const cmdBytes = packAny(
+      "CommandStatementQuery",
+      toBinary(CommandStatementQuerySchema, command)
+    )
     return this.#flight.getFlightInfo({ type: "cmd", cmd: cmdBytes })
   }
 
@@ -321,7 +455,10 @@ export class FlightSqlClient {
       transactionId: options?.transactionId
     })
 
-    const cmdBytes = toBinary(CommandStatementUpdateSchema, command)
+    const cmdBytes = packAny(
+      "CommandStatementUpdate",
+      toBinary(CommandStatementUpdateSchema, command)
+    )
 
     // For updates, we use DoPut with the command as descriptor
 
@@ -376,14 +513,17 @@ export class FlightSqlClient {
       transactionId
     })
 
-    const requestBytes = toBinary(ActionCreatePreparedStatementRequestSchema, request)
+    const requestBytes = packAny(
+      "ActionCreatePreparedStatementRequest",
+      toBinary(ActionCreatePreparedStatementRequestSchema, request)
+    )
 
     let result: ActionCreatePreparedStatementResult | undefined
     for await (const response of this.#flight.doAction({
       type: FLIGHT_SQL_ACTIONS.CREATE_PREPARED_STATEMENT,
       body: requestBytes
     })) {
-      result = fromBinary(ActionCreatePreparedStatementResultSchema, response.body)
+      result = fromBinary(ActionCreatePreparedStatementResultSchema, unpackAny(response.body))
       break
     }
 
@@ -422,7 +562,10 @@ export class FlightSqlClient {
       preparedStatementHandle: statement.handle
     })
 
-    const cmdBytes = toBinary(CommandPreparedStatementQuerySchema, command)
+    const cmdBytes = packAny(
+      "CommandPreparedStatementQuery",
+      toBinary(CommandPreparedStatementQuerySchema, command)
+    )
     const flightInfo = await this.#flight.getFlightInfo({ type: "cmd", cmd: cmdBytes })
 
     for (const endpoint of flightInfo.endpoint) {
@@ -450,7 +593,10 @@ export class FlightSqlClient {
       preparedStatementHandle: statement.handle
     })
 
-    const cmdBytes = toBinary(CommandPreparedStatementUpdateSchema, command)
+    const cmdBytes = packAny(
+      "CommandPreparedStatementUpdate",
+      toBinary(CommandPreparedStatementUpdateSchema, command)
+    )
 
     // If parameters provided, send them via DoPut
     // Otherwise send empty stream
@@ -514,7 +660,10 @@ export class FlightSqlClient {
       preparedStatementHandle: statement.handle
     })
 
-    const requestBytes = toBinary(ActionClosePreparedStatementRequestSchema, request)
+    const requestBytes = packAny(
+      "ActionClosePreparedStatementRequest",
+      toBinary(ActionClosePreparedStatementRequestSchema, request)
+    )
 
     // Fire and forget - no response expected
     for await (const _ of this.#flight.doAction({
@@ -547,14 +696,17 @@ export class FlightSqlClient {
    */
   async beginTransaction(): Promise<Transaction> {
     const request = create(ActionBeginTransactionRequestSchema, {})
-    const requestBytes = toBinary(ActionBeginTransactionRequestSchema, request)
+    const requestBytes = packAny(
+      "ActionBeginTransactionRequest",
+      toBinary(ActionBeginTransactionRequestSchema, request)
+    )
 
     let result: ActionBeginTransactionResult | undefined
     for await (const response of this.#flight.doAction({
       type: FLIGHT_SQL_ACTIONS.BEGIN_TRANSACTION,
       body: requestBytes
     })) {
-      result = fromBinary(ActionBeginTransactionResultSchema, response.body)
+      result = fromBinary(ActionBeginTransactionResultSchema, unpackAny(response.body))
       break
     }
 
@@ -602,7 +754,7 @@ export class FlightSqlClient {
    */
   async getCatalogs<T extends TypeMap = TypeMap>(): Promise<Table<T>> {
     const command = create(CommandGetCatalogsSchema, {})
-    const cmdBytes = toBinary(CommandGetCatalogsSchema, command)
+    const cmdBytes = packAny("CommandGetCatalogs", toBinary(CommandGetCatalogsSchema, command))
     return this.#executeMetadataQuery<T>(cmdBytes)
   }
 
@@ -627,7 +779,7 @@ export class FlightSqlClient {
       catalog: options?.catalog,
       dbSchemaFilterPattern: options?.dbSchemaFilterPattern
     })
-    const cmdBytes = toBinary(CommandGetDbSchemasSchema, command)
+    const cmdBytes = packAny("CommandGetDbSchemas", toBinary(CommandGetDbSchemasSchema, command))
     return this.#executeMetadataQuery<T>(cmdBytes)
   }
 
@@ -661,7 +813,7 @@ export class FlightSqlClient {
       tableTypes: options?.tableTypes ?? [],
       includeSchema: options?.includeSchema ?? false
     })
-    const cmdBytes = toBinary(CommandGetTablesSchema, command)
+    const cmdBytes = packAny("CommandGetTables", toBinary(CommandGetTablesSchema, command))
     return this.#executeMetadataQuery<T>(cmdBytes)
   }
 
@@ -678,7 +830,7 @@ export class FlightSqlClient {
    */
   async getTableTypes<T extends TypeMap = TypeMap>(): Promise<Table<T>> {
     const command = create(CommandGetTableTypesSchema, {})
-    const cmdBytes = toBinary(CommandGetTableTypesSchema, command)
+    const cmdBytes = packAny("CommandGetTableTypes", toBinary(CommandGetTableTypesSchema, command))
     return this.#executeMetadataQuery<T>(cmdBytes)
   }
 
@@ -708,7 +860,10 @@ export class FlightSqlClient {
       catalog: options?.catalog,
       dbSchema: options?.dbSchema
     })
-    const cmdBytes = toBinary(CommandGetPrimaryKeysSchema, command)
+    const cmdBytes = packAny(
+      "CommandGetPrimaryKeys",
+      toBinary(CommandGetPrimaryKeysSchema, command)
+    )
     return this.#executeMetadataQuery<T>(cmdBytes)
   }
 
@@ -754,7 +909,10 @@ export class FlightSqlClient {
       action
     })
 
-    const requestBytes = toBinary(ActionEndTransactionRequestSchema, request)
+    const requestBytes = packAny(
+      "ActionEndTransactionRequest",
+      toBinary(ActionEndTransactionRequestSchema, request)
+    )
 
     for await (const _ of this.#flight.doAction({
       type: FLIGHT_SQL_ACTIONS.END_TRANSACTION,

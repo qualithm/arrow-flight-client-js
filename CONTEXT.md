@@ -63,6 +63,7 @@ for Apache Arrow Flight and Flight SQL protocols.
 | Flight SQL         | Implemented | Query, prepared statements, transactions, metadata (31 tests) |
 | Arrow IPC          | Implemented | Encode/decode via apache-arrow; tableFromArrays, RecordBatch  |
 | Authentication     | Implemented | Bearer tokens, mTLS (TLS options), Handshake (BasicAuth)      |
+| Integration tests  | Implemented | Env-based config; tests for Flight RPC and Flight SQL         |
 
 ---
 
@@ -134,20 +135,58 @@ Acceptance: All core Flight RPC methods operational against a test server
 
 Acceptance: All Flight SQL commands and actions functional
 
+### Integration Testing
+
+- [x] Create integration test infrastructure with environment-based config
+- [x] FlightClient tests: connection, handshake, listFlights, getFlightInfo, getSchema, doGet,
+      doPut, doAction, listActions
+- [x] FlightSqlClient tests: queries, updates, prepared statements, transactions, metadata
+
+Acceptance: Integration tests runnable via `bun test:integration` against any compliant Flight SQL
+server
+
+### Scripts
+
+- [ ] Create demo script showcasing FlightClient usage
+- [ ] Create demo script showcasing FlightSqlClient usage
+
+Acceptance: Runnable scripts demonstrating core library functionality
+
+### Benchmarks
+
+- [ ] Create benchmark infrastructure with warmup and statistics
+- [ ] Benchmark FlightClient doGet/doPut operations
+- [ ] Benchmark FlightSqlClient query operations
+- [ ] Benchmark Arrow IPC encoding/decoding
+
+Acceptance: `bun run bench` produces performance metrics with statistical analysis
+
+### Documentation
+
+- [ ] Generate TypeDoc API documentation
+- [ ] Create usage examples for FlightClient
+- [ ] Create usage examples for FlightSqlClient
+- [ ] Update README with comprehensive usage guide
+
+Acceptance: Complete API docs and runnable examples for all major features
+
 ---
 
 ## Learnings
 
 > Append-only. Never edit or delete existing entries.
 
-| Date       | Learning                                                                                                                                  |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-03-02 | Vendored protos at commit aae49e8ba2; FlightSql.proto imports Flight.proto via package path                                               |
-| 2026-03-02 | Generated proto code excluded from eslint and tsconfig.node.json (uses enums, @ts-nocheck)                                                |
-| 2026-03-02 | ConnectRPC v1.7.0 required; codegen and runtime versions must match (protoc-gen-connect-es)                                               |
-| 2026-03-02 | Removed erasableSyntaxOnly from tsconfig.node.json; generated code uses enums incompatible with it                                        |
-| 2026-03-02 | FlightClient tests use vi.mock for ConnectRPC and generated proto modules to avoid network calls                                          |
-| 2026-03-03 | Authentication uses three patterns: Bearer (via headers), mTLS (via nodeOptions), Handshake (BasicAuth proto via bidirectional streaming) |
-| 2026-03-03 | gRPC transport doesn't need httpVersion parameter; createGrpcTransport always uses HTTP/2                                                 |
-| 2026-03-03 | Arrow IPC via apache-arrow v21: use tableFromArrays for test data; RecordBatchReader.from returns sync reader for Uint8Array input        |
-| 2026-03-03 | FlightSqlClient uses composition over inheritance; wraps FlightClient and delegates core RPC operations                                   |
+| Date       | Learning                                                                                                                                                                                                                                                                       |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-03-02 | Vendored protos at commit aae49e8ba2; FlightSql.proto imports Flight.proto via package path                                                                                                                                                                                    |
+| 2026-03-02 | Generated proto code excluded from eslint and tsconfig.node.json (uses enums, @ts-nocheck)                                                                                                                                                                                     |
+| 2026-03-02 | ConnectRPC v1.7.0 required; codegen and runtime versions must match (protoc-gen-connect-es)                                                                                                                                                                                    |
+| 2026-03-02 | Removed erasableSyntaxOnly from tsconfig.node.json; generated code uses enums incompatible with it                                                                                                                                                                             |
+| 2026-03-02 | FlightClient tests use vi.mock for ConnectRPC and generated proto modules to avoid network calls                                                                                                                                                                               |
+| 2026-03-03 | Authentication uses three patterns: Bearer (via headers), mTLS (via nodeOptions), Handshake (BasicAuth proto via bidirectional streaming)                                                                                                                                      |
+| 2026-03-03 | gRPC transport doesn't need httpVersion parameter; createGrpcTransport always uses HTTP/2                                                                                                                                                                                      |
+| 2026-03-03 | Arrow IPC via apache-arrow v21: use tableFromArrays for test data; RecordBatchReader.from returns sync reader for Uint8Array input                                                                                                                                             |
+| 2026-03-03 | FlightSqlClient uses composition over inheritance; wraps FlightClient and delegates core RPC operations                                                                                                                                                                        |
+| 2026-03-03 | Integration tests use FLIGHT_HOST, FLIGHT_PORT, FLIGHT_TLS env vars for config; mirrored pattern from arrow-flight-js and arrow-flight-sql-js                                                                                                                                  |
+| 2026-03-03 | **Flight SQL commands require protobuf Any wrapper** — Commands must be serialized as `google.protobuf.Any` with `type_url: "type.googleapis.com/arrow.flight.protocol.sql.CommandStatementQuery"` (etc.) and `value: <proto_bytes>`. Raw proto bytes are rejected by servers. |
+| 2026-03-03 | Some Flight SQL servers use REST API for auth tokens instead of Flight Handshake RPC. Pass token via `auth: { type: "bearer", token }` and `FLIGHT_BEARER_TOKEN` env var.                                                                                                      |
