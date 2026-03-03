@@ -15,6 +15,7 @@ const mockListFlights = vi.fn()
 const mockListActions = vi.fn()
 const mockDoAction = vi.fn()
 const mockDoGet = vi.fn()
+const mockDoPut = vi.fn()
 const mockHandshake = vi.fn()
 
 const mockCreateClient = vi.fn(() => ({
@@ -25,6 +26,7 @@ const mockCreateClient = vi.fn(() => ({
   listActions: mockListActions,
   doAction: mockDoAction,
   doGet: mockDoGet,
+  doPut: mockDoPut,
   handshake: mockHandshake
 }))
 
@@ -455,21 +457,33 @@ describe("FlightClient", () => {
       await expect(iterable[Symbol.asyncIterator]().next()).rejects.toThrow("client is closed")
     })
 
-    it("yields data bodies on success", async () => {
+    it("yields FlightData messages on success", async () => {
       const dataMessages = [
-        { dataBody: new Uint8Array([1, 2]) },
-        { dataBody: new Uint8Array([3, 4]) }
+        {
+          $typeName: "arrow.flight.protocol.FlightData",
+          dataHeader: new Uint8Array([0]),
+          dataBody: new Uint8Array([1, 2]),
+          appMetadata: new Uint8Array()
+        },
+        {
+          $typeName: "arrow.flight.protocol.FlightData",
+          dataHeader: new Uint8Array([0]),
+          dataBody: new Uint8Array([3, 4]),
+          appMetadata: new Uint8Array()
+        }
       ]
       mockDoGet.mockReturnValue(asyncIterable(dataMessages))
 
       const client = new FlightClient({ url: "http://localhost:8815" })
-      const collected: Uint8Array[] = []
+      const collected: unknown[] = []
 
       for await (const data of client.doGet({ ticket: new Uint8Array([5]) })) {
         collected.push(data)
       }
 
-      expect(collected).toEqual([new Uint8Array([1, 2]), new Uint8Array([3, 4])])
+      expect(collected).toHaveLength(2)
+      expect(collected[0]).toMatchObject({ dataBody: new Uint8Array([1, 2]) })
+      expect(collected[1]).toMatchObject({ dataBody: new Uint8Array([3, 4]) })
     })
 
     it("wraps errors as FlightError", async () => {
@@ -479,6 +493,78 @@ describe("FlightClient", () => {
 
       const client = new FlightClient({ url: "http://localhost:8815" })
       const iterable = client.doGet({ ticket: new Uint8Array([1]) })
+
+      await expect(iterable[Symbol.asyncIterator]().next()).rejects.toThrow(FlightError)
+    })
+  })
+
+  describe("doPut", () => {
+    it("throws FlightError when client is closed", async () => {
+      const client = new FlightClient({ url: "http://localhost:8815" })
+      client.close()
+
+      const data = asyncIterable([
+        {
+          $typeName: "arrow.flight.protocol.FlightData" as const,
+          dataHeader: new Uint8Array(),
+          dataBody: new Uint8Array([1, 2, 3]),
+          appMetadata: new Uint8Array(),
+          flightDescriptor: undefined
+        }
+      ])
+
+      const iterable = client.doPut(data)
+
+      await expect(iterable[Symbol.asyncIterator]().next()).rejects.toThrow("client is closed")
+    })
+
+    it("yields PutResult messages on success", async () => {
+      const putResults = [
+        { appMetadata: new Uint8Array([1]) },
+        { appMetadata: new Uint8Array([2]) }
+      ]
+      mockDoPut.mockReturnValue(asyncIterable(putResults))
+
+      const client = new FlightClient({ url: "http://localhost:8815" })
+
+      const data = asyncIterable([
+        {
+          $typeName: "arrow.flight.protocol.FlightData" as const,
+          dataHeader: new Uint8Array(),
+          dataBody: new Uint8Array([1, 2, 3]),
+          appMetadata: new Uint8Array(),
+          flightDescriptor: undefined
+        }
+      ])
+
+      const collected: unknown[] = []
+      for await (const result of client.doPut(data)) {
+        collected.push(result)
+      }
+
+      expect(collected).toHaveLength(2)
+      expect(collected[0]).toMatchObject({ appMetadata: new Uint8Array([1]) })
+      expect(collected[1]).toMatchObject({ appMetadata: new Uint8Array([2]) })
+    })
+
+    it("wraps errors as FlightError", async () => {
+      mockDoPut.mockImplementation(() => {
+        throw new Error("upload failed")
+      })
+
+      const client = new FlightClient({ url: "http://localhost:8815" })
+
+      const data = asyncIterable([
+        {
+          $typeName: "arrow.flight.protocol.FlightData" as const,
+          dataHeader: new Uint8Array(),
+          dataBody: new Uint8Array([1, 2, 3]),
+          appMetadata: new Uint8Array(),
+          flightDescriptor: undefined
+        }
+      ])
+
+      const iterable = client.doPut(data)
 
       await expect(iterable[Symbol.asyncIterator]().next()).rejects.toThrow(FlightError)
     })

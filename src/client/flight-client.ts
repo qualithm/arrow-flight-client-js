@@ -8,11 +8,13 @@ import { createGrpcTransport } from "@connectrpc/connect-node"
 import {
   type ActionType,
   BasicAuthSchema,
+  type FlightData,
   type FlightDescriptor,
   type FlightInfo,
   FlightService,
   type HandshakeResponse,
   type PollInfo,
+  type PutResult,
   type Result,
   type SchemaResult
 } from "../gen/arrow/flight/Flight_pb.js"
@@ -287,21 +289,85 @@ export class FlightClient {
    * Retrieve flight data for the given ticket.
    * Returns an async iterable of FlightData messages.
    *
-   * Note: FlightData contains raw Arrow IPC data. Use the Arrow IPC decoder
-   * to parse the data into record batches.
+   * Use the IPC decoding utilities to convert FlightData to Arrow RecordBatches:
+   * - `decodeFlightDataStream()` - decode to RecordBatch stream
+   * - `decodeFlightDataToTable()` - decode to a single Table
+   *
+   * @param ticket - The ticket identifying the data to retrieve
+   * @yields FlightData messages containing Arrow IPC data
+   *
+   * @example
+   * ```ts
+   * import { decodeFlightDataStream } from "@qualithm/arrow-flight-client"
+   *
+   * const stream = client.doGet(ticket)
+   * for await (const batch of decodeFlightDataStream(stream)) {
+   *   console.log(`Received batch with ${batch.numRows} rows`)
+   * }
+   * ```
    */
-  async *doGet(ticket: FlightTicket): AsyncIterable<Uint8Array> {
+  async *doGet(ticket: FlightTicket): AsyncIterable<FlightData> {
     this.#assertOpen()
     try {
       const stream = this.#client.doGet(ticket, {
         headers: this.#getRequestHeaders()
       })
       for await (const data of stream) {
-        // Return the raw data body for downstream IPC decoding
-        yield data.dataBody
+        yield data
       }
     } catch (error) {
       throw this.#wrapError(error, "doGet")
+    }
+  }
+
+  /**
+   * Upload data to the server.
+   * Returns an async iterable of PutResult messages containing server acknowledgements.
+   *
+   * Use the IPC encoding utilities to create FlightData from Arrow data:
+   * - `encodeRecordBatchesToFlightData()` - encode RecordBatch stream
+   * - `encodeTableToFlightData()` - encode a Table
+   *
+   * @param descriptor - The descriptor identifying the upload destination
+   * @param data - Async iterable of FlightData messages to upload
+   * @yields PutResult messages from the server
+   *
+   * @example
+   * ```ts
+   * import { encodeTableToFlightData } from "@qualithm/arrow-flight-client"
+   *
+   * const descriptor = { type: "path", path: ["my", "table"] }
+   * const flightData = encodeTableToFlightData(table)
+   *
+   * // Add descriptor to first message
+   * async function* withDescriptor() {
+   *   let first = true
+   *   for await (const data of flightData) {
+   *     if (first) {
+   *       yield { ...data, flightDescriptor: descriptor }
+   *       first = false
+   *     } else {
+   *       yield data
+   *     }
+   *   }
+   * }
+   *
+   * for await (const result of client.doPut(withDescriptor())) {
+   *   console.log("Server acknowledged:", result.appMetadata)
+   * }
+   * ```
+   */
+  async *doPut(data: AsyncIterable<FlightData>): AsyncIterable<PutResult> {
+    this.#assertOpen()
+    try {
+      const stream = this.#client.doPut(data, {
+        headers: this.#getRequestHeaders()
+      })
+      for await (const result of stream) {
+        yield result
+      }
+    } catch (error) {
+      throw this.#wrapError(error, "doPut")
     }
   }
 

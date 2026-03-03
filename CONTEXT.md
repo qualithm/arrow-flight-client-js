@@ -37,11 +37,11 @@ for Apache Arrow Flight and Flight SQL protocols.
 
 ### Modules
 
-| Module     | Purpose                                  |
-| ---------- | ---------------------------------------- |
-| `index.ts` | Main entry point                         |
-| `client/`  | FlightClient, errors, types, factory     |
-| `greet.ts` | Greeting utility (legacy, to be removed) |
+| Module     | Purpose                                         |
+| ---------- | ----------------------------------------------- |
+| `index.ts` | Main entry point                                |
+| `client/`  | FlightClient, errors, types, factory, IPC utils |
+| `greet.ts` | Greeting utility (legacy, to be removed)        |
 
 ### File Structure
 
@@ -57,12 +57,12 @@ for Apache Arrow Flight and Flight SQL protocols.
 
 ### Features
 
-| Feature            | Status      | Notes                                                     |
-| ------------------ | ----------- | --------------------------------------------------------- |
-| Flight RPC methods | In progress | FlightClient base + unit tests (104 tests, 92%+ coverage) |
-| Flight SQL         | Not started | —                                                         |
-| Arrow IPC          | Not started | —                                                         |
-| Authentication     | Implemented | Bearer tokens, mTLS (TLS options), Handshake (BasicAuth)  |
+| Feature            | Status      | Notes                                                        |
+| ------------------ | ----------- | ------------------------------------------------------------ |
+| Flight RPC methods | In progress | FlightClient base + doGet/doPut (133 tests)                  |
+| Flight SQL         | Not started | —                                                            |
+| Arrow IPC          | Implemented | Encode/decode via apache-arrow; tableFromArrays, RecordBatch |
+| Authentication     | Implemented | Bearer tokens, mTLS (TLS options), Handshake (BasicAuth)     |
 
 ---
 
@@ -120,7 +120,7 @@ for Apache Arrow Flight and Flight SQL protocols.
 - [x] Set up buf code generation with ConnectRPC
 - [x] Implement FlightClient base class with connection management
 - [x] Implement authentication (Bearer tokens, mTLS, Handshake)
-- [ ] Implement Arrow IPC stream encoding/decoding
+- [x] Implement Arrow IPC stream encoding/decoding
 
 Acceptance: All core Flight RPC methods operational against a test server
 
@@ -148,3 +148,4 @@ Acceptance: All Flight SQL commands and actions functional
 | 2026-03-02 | FlightClient tests use vi.mock for ConnectRPC and generated proto modules to avoid network calls                                          |
 | 2026-03-03 | Authentication uses three patterns: Bearer (via headers), mTLS (via nodeOptions), Handshake (BasicAuth proto via bidirectional streaming) |
 | 2026-03-03 | gRPC transport doesn't need httpVersion parameter; createGrpcTransport always uses HTTP/2                                                 |
+| 2026-03-03 | Arrow IPC via apache-arrow v21: use tableFromArrays for test data; RecordBatchReader.from returns sync reader for Uint8Array input        |

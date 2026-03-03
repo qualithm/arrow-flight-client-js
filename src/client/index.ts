@@ -12,6 +12,18 @@ export {
   FlightTimeoutError
 } from "./errors.js"
 
+// IPC utilities
+export type { DecodedFlightData } from "./ipc.js"
+export {
+  createFlightDataFromIpc,
+  decodeFlightDataStream,
+  decodeFlightDataToTable,
+  encodeRecordBatchesToFlightData,
+  encodeTableToFlightData,
+  getSchemaFromFlightData,
+  parseIpcMessage
+} from "./ipc.js"
+
 // Types
 export type {
   AuthOptions,

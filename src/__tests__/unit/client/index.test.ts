@@ -39,6 +39,18 @@ describe("client barrel exports", () => {
     expect(clientModule.FlightServerError).toBeDefined()
     expect(clientModule.FlightCancelledError).toBeDefined()
 
+    // IPC utilities
+    expect(clientModule.decodeFlightDataStream).toBeDefined()
+    expect(typeof clientModule.decodeFlightDataStream).toBe("function")
+    expect(clientModule.decodeFlightDataToTable).toBeDefined()
+    expect(typeof clientModule.decodeFlightDataToTable).toBe("function")
+    expect(clientModule.encodeRecordBatchesToFlightData).toBeDefined()
+    expect(typeof clientModule.encodeRecordBatchesToFlightData).toBe("function")
+    expect(clientModule.encodeTableToFlightData).toBeDefined()
+    expect(typeof clientModule.encodeTableToFlightData).toBe("function")
+    expect(clientModule.getSchemaFromFlightData).toBeDefined()
+    expect(typeof clientModule.getSchemaFromFlightData).toBe("function")
+
     // Type-related constant exports
     expect(clientModule.DEFAULT_TIMEOUT_MS).toBe(30_000)
   })
