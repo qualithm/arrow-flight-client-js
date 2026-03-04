@@ -168,10 +168,10 @@ IPC metrics
 
 ### Documentation
 
-- [ ] Generate TypeDoc API documentation
-- [ ] Create usage examples for FlightClient
-- [ ] Create usage examples for FlightSqlClient
-- [ ] Update README with comprehensive usage guide
+- [x] Generate TypeDoc API documentation
+- [x] Create usage examples for FlightClient
+- [x] Create usage examples for FlightSqlClient
+- [x] Update README with comprehensive usage guide
 
 Acceptance: Complete API docs and runnable examples for all major features
 
@@ -198,3 +198,4 @@ Acceptance: Complete API docs and runnable examples for all major features
 | 2026-03-04 | Demo scripts use env vars (FLIGHT_HOST, FLIGHT_PORT, FLIGHT_TLS, FLIGHT_USERNAME, FLIGHT_PASSWORD, FLIGHT_BEARER_TOKEN) for configuration. Run via `bun run demo:flight` and `bun run demo:flight-sql`.                                                                        |
 | 2026-03-04 | Benchmarks cover Arrow IPC encode/decode performance with percentiles (P50, P95, P99), throughput (rows/s, MB/s), and coefficient of variation. Configure via WARMUP_ITERATIONS, BENCH_ITERATIONS, BENCH_SIZES env vars. Run via `bun run bench:ipc`.                          |
 | 2026-03-05 | Server benchmarks (`bun run bench`) test both reads and writes: FlightClient (listFlights, getFlightInfo, doGet, doPut) and FlightSqlClient (query, prepared statements, metadata, executeUpdate). Uses BENCH_WRITES=false to skip writes, BENCH_WRITE_ROWS for row count.     |
+| 2026-03-05 | TypeDoc generates API docs to `docs/` directory. Examples in `examples/` are excluded from strict lint rules (no-console, strict-boolean-expressions) via eslint.base.config.ts scripts-overrides section. Run `bun run docs` to regenerate.                                   |
