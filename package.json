@@ -43,6 +43,7 @@
   },
   "scripts": {
     "bench": "bun run bench/index.ts",
+    "bench:ipc": "bun run bench/ipc.ts",
     "build:watch": "tsc -p tsconfig.build.json --watch",
     "build": "tsc -p tsconfig.build.json",
     "clean": "rm -rf dist",

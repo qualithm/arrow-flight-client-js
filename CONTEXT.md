@@ -154,12 +154,17 @@ Acceptance: Runnable scripts demonstrating core library functionality
 
 ### Benchmarks
 
-- [ ] Create benchmark infrastructure with warmup and statistics
-- [ ] Benchmark FlightClient doGet/doPut operations
-- [ ] Benchmark FlightSqlClient query operations
-- [ ] Benchmark Arrow IPC encoding/decoding
+- [x] Create benchmark infrastructure with warmup and statistics
+- [x] Benchmark Arrow IPC encoding/decoding (read + write)
+- [x] Benchmark column type performance (Int32, Float64, String, Mixed)
+- [x] Benchmark round-trip operations (encode + decode)
+- [x] Benchmark FlightClient reads (listFlights, getFlightInfo, doGet)
+- [x] Benchmark FlightClient writes (doPut)
+- [x] Benchmark FlightSqlClient reads (query, prepared statements, metadata)
+- [x] Benchmark FlightSqlClient writes (executeUpdate INSERT/UPDATE/DELETE)
 
-Acceptance: `bun run bench` produces performance metrics with statistical analysis
+Acceptance: `bun run bench` produces server metrics (reads + writes); `bun run bench:ipc` produces
+IPC metrics
 
 ### Documentation
 
@@ -191,3 +196,5 @@ Acceptance: Complete API docs and runnable examples for all major features
 | 2026-03-03 | **Flight SQL commands require protobuf Any wrapper** — Commands must be serialized as `google.protobuf.Any` with `type_url: "type.googleapis.com/arrow.flight.protocol.sql.CommandStatementQuery"` (etc.) and `value: <proto_bytes>`. Raw proto bytes are rejected by servers. |
 | 2026-03-03 | Some Flight SQL servers use REST API for auth tokens instead of Flight Handshake RPC. Pass token via `auth: { type: "bearer", token }` and `FLIGHT_BEARER_TOKEN` env var.                                                                                                      |
 | 2026-03-04 | Demo scripts use env vars (FLIGHT_HOST, FLIGHT_PORT, FLIGHT_TLS, FLIGHT_USERNAME, FLIGHT_PASSWORD, FLIGHT_BEARER_TOKEN) for configuration. Run via `bun run demo:flight` and `bun run demo:flight-sql`.                                                                        |
+| 2026-03-04 | Benchmarks cover Arrow IPC encode/decode performance with percentiles (P50, P95, P99), throughput (rows/s, MB/s), and coefficient of variation. Configure via WARMUP_ITERATIONS, BENCH_ITERATIONS, BENCH_SIZES env vars. Run via `bun run bench:ipc`.                          |
+| 2026-03-05 | Server benchmarks (`bun run bench`) test both reads and writes: FlightClient (listFlights, getFlightInfo, doGet, doPut) and FlightSqlClient (query, prepared statements, metadata, executeUpdate). Uses BENCH_WRITES=false to skip writes, BENCH_WRITE_ROWS for row count.     |
