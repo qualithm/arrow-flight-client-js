@@ -147,8 +147,8 @@ server
 
 ### Scripts
 
-- [ ] Create demo script showcasing FlightClient usage
-- [ ] Create demo script showcasing FlightSqlClient usage
+- [x] Create demo script showcasing FlightClient usage
+- [x] Create demo script showcasing FlightSqlClient usage
 
 Acceptance: Runnable scripts demonstrating core library functionality
 
@@ -190,3 +190,4 @@ Acceptance: Complete API docs and runnable examples for all major features
 | 2026-03-03 | Integration tests use FLIGHT_HOST, FLIGHT_PORT, FLIGHT_TLS env vars for config; mirrored pattern from arrow-flight-js and arrow-flight-sql-js                                                                                                                                  |
 | 2026-03-03 | **Flight SQL commands require protobuf Any wrapper** — Commands must be serialized as `google.protobuf.Any` with `type_url: "type.googleapis.com/arrow.flight.protocol.sql.CommandStatementQuery"` (etc.) and `value: <proto_bytes>`. Raw proto bytes are rejected by servers. |
 | 2026-03-03 | Some Flight SQL servers use REST API for auth tokens instead of Flight Handshake RPC. Pass token via `auth: { type: "bearer", token }` and `FLIGHT_BEARER_TOKEN` env var.                                                                                                      |
+| 2026-03-04 | Demo scripts use env vars (FLIGHT_HOST, FLIGHT_PORT, FLIGHT_TLS, FLIGHT_USERNAME, FLIGHT_PASSWORD, FLIGHT_BEARER_TOKEN) for configuration. Run via `bun run demo:flight` and `bun run demo:flight-sql`.                                                                        |
