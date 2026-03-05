@@ -84,25 +84,29 @@ describe("Actions Integration", () => {
     })
 
     it("error action returns error", async () => {
-      await expect(async () => {
-        for await (const _ of client.doAction({
-          type: "error",
-          body: new Uint8Array()
-        })) {
-          // Should not reach here
-        }
-      }).rejects.toThrow()
+      await expect(
+        (async () => {
+          for await (const _ of client.doAction({
+            type: "error",
+            body: new Uint8Array()
+          })) {
+            // Should not reach here
+          }
+        })()
+      ).rejects.toThrow()
     })
 
     it("returns error for unknown action", async () => {
-      await expect(async () => {
-        for await (const _ of client.doAction({
-          type: "unknown-action-that-does-not-exist",
-          body: new Uint8Array()
-        })) {
-          // Should not reach here
-        }
-      }).rejects.toThrow()
+      await expect(
+        (async () => {
+          for await (const _ of client.doAction({
+            type: "unknown-action-that-does-not-exist",
+            body: new Uint8Array()
+          })) {
+            // Should not reach here
+          }
+        })()
+      ).rejects.toThrow()
     })
   })
 })
