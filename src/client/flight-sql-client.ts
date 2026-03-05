@@ -900,6 +900,7 @@ export class FlightSqlClient {
     return decodeFlightDataToTable<T>(toAsyncIterable(allData))
   }
 
+  /** Commits or rolls back a transaction using EndTransaction action. */
   async #endTransaction(
     transaction: Transaction,
     action: ActionEndTransactionRequest_EndTransaction
@@ -922,6 +923,7 @@ export class FlightSqlClient {
     }
   }
 
+  /** Creates an empty FlightData stream with only a descriptor (for updates). */
   // eslint-disable-next-line @typescript-eslint/require-await
   async *#createEmptyStream(cmdBytes: Uint8Array): AsyncGenerator<FlightData> {
     yield {

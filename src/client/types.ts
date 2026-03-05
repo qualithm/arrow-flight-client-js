@@ -130,6 +130,9 @@ export function resolveOptions(options: FlightClientOptions): ResolvedFlightClie
 
 /**
  * Descriptor for a Flight — either a path or a command.
+ *
+ * - `path`: Identifies a dataset by hierarchical path (e.g., ["database", "table"])
+ * - `cmd`: Identifies a dataset by an opaque command (e.g., serialised SQL query)
  */
 export type FlightDescriptorInput =
   | { type: "path"; path: string[] }
@@ -147,6 +150,7 @@ export type FlightCriteria = {
  * Ticket for retrieving a specific flight stream.
  */
 export type FlightTicket = {
+  /** Opaque ticket bytes returned by the server in FlightEndpoint. */
   ticket: Uint8Array
 }
 
@@ -154,6 +158,8 @@ export type FlightTicket = {
  * Action request for DoAction RPC.
  */
 export type FlightAction = {
+  /** Action type identifier (e.g., "DropDataset", "CancelFlightInfo"). */
   type: string
+  /** Optional action body containing serialised parameters. */
   body?: Uint8Array
 }

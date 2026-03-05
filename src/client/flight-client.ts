@@ -194,6 +194,9 @@ export class FlightClient {
 
   /**
    * Get information about a specific flight.
+   *
+   * @param descriptor - Flight descriptor identifying the dataset
+   * @returns Flight information including schema and endpoints
    */
   async getFlightInfo(descriptor: FlightDescriptorInput): Promise<FlightInfo> {
     this.#assertOpen()
@@ -208,6 +211,9 @@ export class FlightClient {
 
   /**
    * Poll for updated flight information (useful for long-running queries).
+   *
+   * @param descriptor - Flight descriptor identifying the dataset
+   * @returns Poll information with progress and updated flight info
    */
   async pollFlightInfo(descriptor: FlightDescriptorInput): Promise<PollInfo> {
     this.#assertOpen()
@@ -222,6 +228,9 @@ export class FlightClient {
 
   /**
    * Get the schema for a flight.
+   *
+   * @param descriptor - Flight descriptor identifying the dataset
+   * @returns Schema result containing the Arrow schema bytes
    */
   async getSchema(descriptor: FlightDescriptorInput): Promise<SchemaResult> {
     this.#assertOpen()
@@ -236,6 +245,9 @@ export class FlightClient {
 
   /**
    * List available flights matching the given criteria.
+   *
+   * @param criteria - Optional filter criteria for listing flights
+   * @yields FlightInfo for each matching flight
    */
   async *listFlights(criteria?: FlightCriteria): AsyncIterable<FlightInfo> {
     this.#assertOpen()
@@ -254,6 +266,8 @@ export class FlightClient {
 
   /**
    * List available actions supported by the server.
+   *
+   * @yields ActionType describing each available action
    */
   async *listActions(): AsyncIterable<ActionType> {
     this.#assertOpen()
@@ -269,6 +283,9 @@ export class FlightClient {
 
   /**
    * Execute a custom action on the server.
+   *
+   * @param action - The action to execute (type and optional body)
+   * @yields Result messages from the server
    */
   async *doAction(action: FlightAction): AsyncIterable<Result> {
     this.#assertOpen()
@@ -373,12 +390,14 @@ export class FlightClient {
 
   // ── Private helpers ──────────────────────────────────────────────────
 
+  /** Throws if the client has been closed. */
   #assertOpen(): void {
     if (this.#closed) {
       throw new FlightError("client is closed")
     }
   }
 
+  /** Converts a FlightDescriptorInput to the proto FlightDescriptor format. */
   #toFlightDescriptor(input: FlightDescriptorInput): Partial<FlightDescriptor> {
     if (input.type === "path") {
       return { type: 1, path: input.path } // PATH = 1
@@ -386,6 +405,7 @@ export class FlightClient {
     return { type: 2, cmd: input.cmd } // CMD = 2
   }
 
+  /** Builds Node.js HTTP/2 options including TLS configuration. */
   #buildNodeOptions(): Record<string, unknown> {
     const nodeOptions: Record<string, unknown> = { ...this.#options.nodeOptions }
 
@@ -412,6 +432,7 @@ export class FlightClient {
     return nodeOptions
   }
 
+  /** Returns headers for requests, including auth token if authenticated. */
   #getRequestHeaders(): Record<string, string> {
     const headers: Record<string, string> = { ...this.#options.headers }
 
@@ -423,6 +444,7 @@ export class FlightClient {
     return headers
   }
 
+  /** Wraps errors in appropriate FlightError subclasses based on error type. */
   #wrapError(error: unknown, operation: string): FlightError {
     if (FlightError.isError(error)) {
       return error
