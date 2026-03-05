@@ -345,8 +345,7 @@ export class FlightClient {
    * - `encodeRecordBatchesToFlightData()` - encode RecordBatch stream
    * - `encodeTableToFlightData()` - encode a Table
    *
-   * @param descriptor - The descriptor identifying the upload destination
-   * @param data - Async iterable of FlightData messages to upload
+   * @param data - Async iterable of FlightData messages to upload (include descriptor in first message)
    * @yields PutResult messages from the server
    *
    * @example

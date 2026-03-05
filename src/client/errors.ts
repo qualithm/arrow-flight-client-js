@@ -2,7 +2,9 @@
  * Base error class for all Flight client errors.
  */
 export class FlightError extends Error {
+  /** Error name for identification. */
   override readonly name: string = "FlightError"
+  /** Original error that caused this error, if any. */
   override readonly cause: unknown
 
   constructor(message: string, cause?: unknown) {
@@ -22,7 +24,9 @@ export class FlightError extends Error {
  * Error thrown when a connection to the Flight server fails.
  */
 export class FlightConnectionError extends FlightError {
+  /** Error name for identification. */
   override readonly name: string = "FlightConnectionError"
+  /** URL that failed to connect. */
   readonly url: string
 
   constructor(message: string, url: string, cause?: unknown) {
@@ -42,6 +46,7 @@ export class FlightConnectionError extends FlightError {
  * Error thrown when authentication fails.
  */
 export class FlightAuthError extends FlightError {
+  /** Error name for identification. */
   override readonly name: string = "FlightAuthError"
 
   /**
@@ -56,7 +61,9 @@ export class FlightAuthError extends FlightError {
  * Error thrown when a request times out.
  */
 export class FlightTimeoutError extends FlightError {
+  /** Error name for identification. */
   override readonly name: string = "FlightTimeoutError"
+  /** Timeout duration in milliseconds that was exceeded. */
   readonly timeoutMs: number
 
   constructor(message: string, timeoutMs: number, cause?: unknown) {
@@ -76,8 +83,11 @@ export class FlightTimeoutError extends FlightError {
  * Error thrown when the server returns an error response.
  */
 export class FlightServerError extends FlightError {
+  /** Error name for identification. */
   override readonly name: string = "FlightServerError"
+  /** gRPC status code from the server. */
   readonly code: string
+  /** Additional error details from the server, if provided. */
   readonly details: string | undefined
 
   constructor(message: string, code: string, details?: string, cause?: unknown) {
@@ -98,6 +108,7 @@ export class FlightServerError extends FlightError {
  * Error thrown when an operation is cancelled.
  */
 export class FlightCancelledError extends FlightError {
+  /** Error name for identification. */
   override readonly name: string = "FlightCancelledError"
 
   /**

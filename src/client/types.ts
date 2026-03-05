@@ -37,18 +37,38 @@ export type TlsOptions = {
  * Basic authentication credentials for Flight Handshake.
  */
 export type BasicAuthCredentials = {
+  /** Username for authentication. */
   username: string
+  /** Password for authentication. */
   password: string
 }
 
 /**
  * Authentication options for Flight client.
  * Only one authentication method should be specified.
+ *
+ * @remarks
+ * - `bearer`: Sets Authorization header with Bearer token
+ * - `basic`: Uses Flight Handshake RPC with BasicAuth credentials
+ * - `none`: No authentication
  */
 export type AuthOptions =
-  | { type: "bearer"; token: string }
-  | { type: "basic"; credentials: BasicAuthCredentials }
-  | { type: "none" }
+  | {
+      /** Bearer token authentication type. */
+      type: "bearer"
+      /** Bearer token value. */
+      token: string
+    }
+  | {
+      /** Basic authentication type using Flight Handshake. */
+      type: "basic"
+      /** Username and password credentials. */
+      credentials: BasicAuthCredentials
+    }
+  | {
+      /** No authentication. */
+      type: "none"
+    }
 
 /**
  * Configuration options for creating a Flight client.
@@ -131,12 +151,23 @@ export function resolveOptions(options: FlightClientOptions): ResolvedFlightClie
 /**
  * Descriptor for a Flight — either a path or a command.
  *
+ * @remarks
  * - `path`: Identifies a dataset by hierarchical path (e.g., ["database", "table"])
  * - `cmd`: Identifies a dataset by an opaque command (e.g., serialised SQL query)
  */
 export type FlightDescriptorInput =
-  | { type: "path"; path: string[] }
-  | { type: "cmd"; cmd: Uint8Array }
+  | {
+      /** Path-based descriptor type. */
+      type: "path"
+      /** Hierarchical path segments identifying the dataset. */
+      path: string[]
+    }
+  | {
+      /** Command-based descriptor type. */
+      type: "cmd"
+      /** Opaque command bytes (e.g., serialised SQL query). */
+      cmd: Uint8Array
+    }
 
 /**
  * Criteria for listing flights.

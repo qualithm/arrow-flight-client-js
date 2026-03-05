@@ -6,8 +6,46 @@
   "excludePrivate": true,
   "excludeProtected": true,
   "excludeExternals": true,
+  "excludeInternal": true,
   "includeVersion": true,
   "navigationLinks": {
     "GitHub": "https://github.com/qualithm/arrow-flight-client-js"
-  }
+  },
+  "exclude": ["**/gen/**"],
+  "blockTags": [
+    "@default",
+    "@defaultValue",
+    "@deprecated",
+    "@example",
+    "@generated",
+    "@param",
+    "@remarks",
+    "@returns",
+    "@see",
+    "@throws",
+    "@yields"
+  ],
+  "validation": {
+    "notExported": true,
+    "invalidLink": true,
+    "notDocumented": true
+  },
+  "intentionallyNotExported": [
+    "FlightData",
+    "FlightInfo",
+    "PollInfo",
+    "SchemaResult",
+    "ActionType",
+    "Result",
+    "PutResult"
+  ],
+  "requiredToBeDocumented": [
+    "Variable",
+    "Function",
+    "Class",
+    "Interface",
+    "Property",
+    "Method",
+    "TypeAlias"
+  ]
 }

@@ -22,11 +22,29 @@ import type { FlightData } from "../gen/arrow/flight/Flight_pb.js"
 
 /**
  * Result of decoding a single FlightData message.
+ *
+ * @remarks
+ * - `schema`: Message contained schema information
+ * - `batch`: Message contained a record batch
+ * - `empty`: Message contained no data (keep-alive)
  */
 export type DecodedFlightData =
-  | { type: "schema"; schema: Schema }
-  | { type: "batch"; batch: RecordBatch }
-  | { type: "empty" }
+  | {
+      /** Schema message type. */
+      type: "schema"
+      /** Decoded Arrow schema. */
+      schema: Schema
+    }
+  | {
+      /** Record batch message type. */
+      type: "batch"
+      /** Decoded Arrow record batch. */
+      batch: RecordBatch
+    }
+  | {
+      /** Empty message type (keep-alive). */
+      type: "empty"
+    }
 
 /**
  * Decode a stream of FlightData messages into Arrow RecordBatches.
