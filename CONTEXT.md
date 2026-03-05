@@ -7,8 +7,8 @@
 
 ## System Intent
 
-Unified Arrow Flight client for JavaScript and TypeScript runtimes. Provides a complete gRPC client
-for Apache Arrow Flight and Flight SQL protocols.
+Unified Arrow Flight and Flight SQL client for JavaScript and TypeScript runtimes. Provides a
+complete gRPC client for Apache Arrow Flight and Flight SQL protocols.
 
 **Key capabilities:**
 

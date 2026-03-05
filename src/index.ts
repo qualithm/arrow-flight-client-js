@@ -1,5 +1,5 @@
 /**
- * Unified Arrow Flight client for JavaScript and TypeScript runtimes.
+ * Unified Arrow Flight and Flight SQL client for JavaScript and TypeScript runtimes.
  *
  * @packageDocumentation
  */

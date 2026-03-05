@@ -4,8 +4,8 @@
 [![codecov](https://codecov.io/gh/qualithm/arrow-flight-client-js/graph/badge.svg)](https://codecov.io/gh/qualithm/arrow-flight-client-js)
 [![npm](https://img.shields.io/npm/v/@qualithm/arrow-flight-client)](https://www.npmjs.com/package/@qualithm/arrow-flight-client)
 
-Unified Arrow Flight client for JavaScript and TypeScript runtimes. Provides complete gRPC client
-support for Apache Arrow Flight and Flight SQL protocols.
+Unified Arrow Flight and Flight SQL client for JavaScript and TypeScript runtimes. Provides complete
+gRPC client support for Apache Arrow Flight and Flight SQL protocols.
 
 ## Features
 
