@@ -1,0 +1,14 @@
+{
+  "$schema": "https://deno.land/x/deno/cli/schemas/config-file.v1.json",
+  "imports": {
+    "@connectrpc/connect-node": "npm:@connectrpc/connect-node",
+    "@connectrpc/connect": "npm:@connectrpc/connect",
+    "@bufbuild/protobuf": "npm:@bufbuild/protobuf",
+    "@bufbuild/protobuf/wkt": "npm:@bufbuild/protobuf/wkt",
+    "@bufbuild/protobuf/codegenv2": "npm:@bufbuild/protobuf/codegenv2",
+    "apache-arrow": "npm:apache-arrow"
+  },
+  "compilerOptions": {
+    "lib": ["deno.ns", "dom"]
+  }
+}

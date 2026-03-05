@@ -18,7 +18,11 @@
  * - FLIGHT_BEARER_TOKEN: Bearer token for auth (optional)
  */
 
-import { createFlightSqlClient, FlightConnectionError, FlightError } from "../src/client"
+import {
+  createFlightSqlClient,
+  FlightConnectionError,
+  FlightError
+} from "@qualithm/arrow-flight-client"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Configuration

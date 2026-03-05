@@ -41,19 +41,19 @@ for Apache Arrow Flight and Flight SQL protocols.
 | ---------- | ---------------------------------------------------------------- |
 | `index.ts` | Main entry point                                                 |
 | `client/`  | FlightClient, FlightSqlClient, errors, types, factory, IPC utils |
-| `greet.ts` | Greeting utility (legacy, to be removed)                         |
 
 ### File Structure
 
-| Directory     | Purpose                                |
-| ------------- | -------------------------------------- |
-| `bench/`      | Benchmarks with stats                  |
-| `examples/`   | Runnable usage examples                |
-| `proto/`      | Vendored proto files from apache/arrow |
-| `scripts/`    | Development utilities                  |
-| `src/`        | Source code                            |
-| `src/client/` | FlightClient implementation            |
-| `src/gen/`    | Generated proto TypeScript (buf)       |
+| Directory     | Purpose                                  |
+| ------------- | ---------------------------------------- |
+| `bench/`      | Benchmarks with stats                    |
+| `docs/`       | Generated TypeDoc + server compatibility |
+| `examples/`   | Runnable usage examples                  |
+| `proto/`      | Vendored proto files from apache/arrow   |
+| `scripts/`    | Development utilities                    |
+| `src/`        | Source code                              |
+| `src/client/` | FlightClient implementation              |
+| `src/gen/`    | Generated proto TypeScript (buf)         |
 
 ### Features
 
@@ -64,6 +64,7 @@ for Apache Arrow Flight and Flight SQL protocols.
 | Arrow IPC          | Implemented | Encode/decode via apache-arrow; tableFromArrays, RecordBatch  |
 | Authentication     | Implemented | Bearer tokens, mTLS (TLS options), Handshake (BasicAuth)      |
 | Integration tests  | Implemented | Env-based config; tests for Flight RPC and Flight SQL         |
+| Cross-runtime      | Validated   | Bun, Node.js 22+, Deno (with import map)                      |
 
 ---
 
@@ -98,10 +99,10 @@ for Apache Arrow Flight and Flight SQL protocols.
 
 ### Risks
 
-| ID  | Risk                            | Impact | Mitigation                               |
-| --- | ------------------------------- | ------ | ---------------------------------------- |
-| R-1 | Large bundle size               | Medium | Tree-shaking, optional heavy deps        |
-| R-2 | Server compatibility variations | Medium | Test against multiple Flight SQL servers |
+| ID  | Risk                            | Impact | Mitigation                                                                   |
+| --- | ------------------------------- | ------ | ---------------------------------------------------------------------------- |
+| R-1 | Large bundle size               | Medium | Tree-shaking supported; `bun run analyze:bundle` shows 46KB for FlightClient |
+| R-2 | Server compatibility variations | Medium | Server compatibility docs; env-configurable integration tests                |
 
 ---
 
@@ -145,13 +146,6 @@ Acceptance: All Flight SQL commands and actions functional
 Acceptance: Integration tests runnable via `bun test:integration` against any compliant Flight SQL
 server
 
-### Scripts
-
-- [x] Create demo script showcasing FlightClient usage
-- [x] Create demo script showcasing FlightSqlClient usage
-
-Acceptance: Runnable scripts demonstrating core library functionality
-
 ### Benchmarks
 
 - [x] Create benchmark infrastructure with warmup and statistics
@@ -174,6 +168,18 @@ IPC metrics
 - [x] Update README with comprehensive usage guide
 
 Acceptance: Complete API docs and runnable examples for all major features
+
+### Cross-Runtime & Quality
+
+- [x] Cross-runtime validation script (Bun, Node.js, Deno)
+- [x] Remove legacy greet.ts module
+- [x] Update examples to use package imports
+- [x] Bundle size analysis script
+- [x] Server compatibility documentation
+- [x] Deno import map configuration (deno.json)
+
+Acceptance: `bun run validate:runtime` passes for all runtimes; `bun run analyze:bundle` shows
+tree-shaking impact
 
 ---
 
@@ -199,3 +205,7 @@ Acceptance: Complete API docs and runnable examples for all major features
 | 2026-03-04 | Benchmarks cover Arrow IPC encode/decode performance with percentiles (P50, P95, P99), throughput (rows/s, MB/s), and coefficient of variation. Configure via WARMUP_ITERATIONS, BENCH_ITERATIONS, BENCH_SIZES env vars. Run via `bun run bench:ipc`.                          |
 | 2026-03-05 | Server benchmarks (`bun run bench`) test both reads and writes: FlightClient (listFlights, getFlightInfo, doGet, doPut) and FlightSqlClient (query, prepared statements, metadata, executeUpdate). Uses BENCH_WRITES=false to skip writes, BENCH_WRITE_ROWS for row count.     |
 | 2026-03-05 | TypeDoc generates API docs to `docs/` directory. Examples in `examples/` are excluded from strict lint rules (no-console, strict-boolean-expressions) via eslint.base.config.ts scripts-overrides section. Run `bun run docs` to regenerate.                                   |
+| 2026-03-05 | **Deno requires import maps for npm packages.** Bare specifiers like `@connectrpc/connect-node` don't resolve in Deno. Use `deno.json` with `imports` mapping to `npm:` specifiers. Subpaths need explicit mappings (e.g., `@bufbuild/protobuf/wkt`).                          |
+| 2026-03-05 | Cross-runtime validation script (`bun run validate:runtime`) tests imports on Bun, Node.js, and Deno. Creates temp directory, generates test file, runs each runtime. Validates all exports and client instantiation.                                                          |
+| 2026-03-05 | Bundle analysis (`bun run analyze:bundle`): Full library ~187KB raw / 37KB gzip. FlightClient-only ~46KB raw / 12KB gzip due to tree-shaking. FlightSql_pb.js is largest file at 114KB due to extensive SQL commands.                                                          |
+| 2026-03-05 | Removed demo scripts (scripts/demo-\*.ts) in favour of examples/ folder. Examples use package imports (`@qualithm/arrow-flight-client`) and are runnable directly with `bun run examples/flight-client.ts`.                                                                    |

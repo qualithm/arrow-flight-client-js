@@ -17,15 +17,14 @@
  * - FLIGHT_BEARER_TOKEN: Bearer token for auth (optional)
  */
 
-import { tableFromArrays } from "apache-arrow"
-
 import {
   createFlightClient,
   decodeFlightDataToTable,
   encodeTableToFlightData,
   FlightConnectionError,
   FlightError
-} from "../src/client"
+} from "@qualithm/arrow-flight-client"
+import { tableFromArrays } from "apache-arrow"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Configuration

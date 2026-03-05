@@ -4,29 +4,55 @@
  * @packageDocumentation
  */
 
-// Client
+// Clients
 export {
   createFlightClient,
-  // Constants
-  DEFAULT_TIMEOUT_MS,
+  createFlightSqlClient,
+  FlightClient,
+  FlightSqlClient
+} from "./client/index.js"
+
+// Errors
+export {
   FlightAuthError,
   FlightCancelledError,
-  FlightClient,
   FlightConnectionError,
-  // Errors
   FlightError,
   FlightServerError,
   FlightTimeoutError
 } from "./client/index.js"
 
-// Types
+// IPC utilities
+export {
+  createFlightDataFromIpc,
+  decodeFlightDataStream,
+  decodeFlightDataToTable,
+  encodeRecordBatchesToFlightData,
+  encodeTableToFlightData,
+  getSchemaFromFlightData,
+  parseIpcMessage
+} from "./client/index.js"
+
+// Constants
+export { DEFAULT_TIMEOUT_MS } from "./client/index.js"
+
+// Client types
 export type {
+  AuthOptions,
+  BasicAuthCredentials,
+  DecodedFlightData,
+  ExecuteQueryOptions,
+  ExecuteUpdateOptions,
   FlightAction,
   FlightClientOptions,
   FlightCriteria,
   FlightDescriptorInput,
   FlightTicket,
-  ResolvedFlightClientOptions
+  PreparedStatement,
+  ResolvedFlightClientOptions,
+  TlsOptions,
+  Transaction,
+  UpdateResult
 } from "./client/index.js"
 
 // Re-export generated proto types for advanced usage
@@ -41,6 +67,3 @@ export type {
   SchemaResult,
   Ticket
 } from "./gen/arrow/flight/Flight_pb.js"
-
-// Legacy exports (to be removed in future major version)
-export { greet, type GreetOptions } from "./greet.js"
