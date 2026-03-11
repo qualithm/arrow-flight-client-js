@@ -17,7 +17,7 @@ import {
   FlightDataSchema,
   FlightDescriptor_DescriptorType
 } from "../../gen/arrow/flight/Flight_pb"
-import { config } from "./config"
+import { config, isFlightAvailable } from "./config"
 
 /** Convert path segments to a FlightDescriptor. */
 function pathDescriptor(...path: string[]): FlightDescriptorInput {
@@ -26,8 +26,14 @@ function pathDescriptor(...path: string[]): FlightDescriptorInput {
 
 describe("Data Operations Integration", () => {
   let client: FlightClient
+  let available: boolean
 
   beforeAll(async () => {
+    available = await isFlightAvailable()
+    if (!available) {
+      return
+    }
+
     client = createFlightClient({
       url: config.url,
       auth: {
@@ -39,11 +45,17 @@ describe("Data Operations Integration", () => {
   })
 
   afterAll(() => {
-    client.close()
+    if (available) {
+      client.close()
+    }
   })
 
   describe("doGet", () => {
     it("retrieves data for test/integers", async () => {
+      if (!available) {
+        return
+      }
+
       const descriptor = pathDescriptor(...config.flights.integers)
       const info = await client.getFlightInfo(descriptor)
 
@@ -66,6 +78,10 @@ describe("Data Operations Integration", () => {
     })
 
     it("retrieves data for test/strings", async () => {
+      if (!available) {
+        return
+      }
+
       const descriptor = pathDescriptor(...config.flights.strings)
       const info = await client.getFlightInfo(descriptor)
 
@@ -77,6 +93,10 @@ describe("Data Operations Integration", () => {
     })
 
     it("returns empty result for test/empty", async () => {
+      if (!available) {
+        return
+      }
+
       const descriptor = pathDescriptor(...config.flights.empty)
       const info = await client.getFlightInfo(descriptor)
 
@@ -86,6 +106,10 @@ describe("Data Operations Integration", () => {
     })
 
     it("retrieves large dataset", async () => {
+      if (!available) {
+        return
+      }
+
       const descriptor = pathDescriptor(...config.flights.large)
       const info = await client.getFlightInfo(descriptor)
 
@@ -95,6 +119,10 @@ describe("Data Operations Integration", () => {
     })
 
     it("retrieves nested types", async () => {
+      if (!available) {
+        return
+      }
+
       const descriptor = pathDescriptor(...config.flights.nested)
       const info = await client.getFlightInfo(descriptor)
 
@@ -108,6 +136,10 @@ describe("Data Operations Integration", () => {
 
   describe("doPut", () => {
     it("uploads data and receives acknowledgement", async () => {
+      if (!available) {
+        return
+      }
+
       // First, get schema from an existing flight to use as template
       const descriptor = pathDescriptor(...config.flights.integers)
       const info = await client.getFlightInfo(descriptor)

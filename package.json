@@ -12,6 +12,7 @@
     "apache-arrow",
     "typescript"
   ],
+  "sideEffects": false,
   "license": "Apache-2.0",
   "author": "Qualithm",
   "repository": {
@@ -28,9 +29,17 @@
   "exports": {
     ".": {
       "bun": "./dist/index.js",
+      "deno": "./dist/index.js",
       "node": "./dist/index.js",
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./testing": {
+      "bun": "./dist/testing/index.js",
+      "deno": "./dist/testing/index.js",
+      "node": "./dist/testing/index.js",
+      "import": "./dist/testing/index.js",
+      "types": "./dist/testing/index.d.ts"
     }
   },
   "files": [

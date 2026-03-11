@@ -6,12 +6,18 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest"
 
 import { createFlightSqlClient, type FlightSqlClient, type Transaction } from "../../client"
-import { config } from "./config"
+import { config, isFlightAvailable } from "./config"
 
 describe("Transactions Integration", () => {
   let client: FlightSqlClient
+  let available: boolean
 
   beforeAll(async () => {
+    available = await isFlightAvailable()
+    if (!available) {
+      return
+    }
+
     client = createFlightSqlClient({
       url: config.url,
       auth: {
@@ -23,7 +29,9 @@ describe("Transactions Integration", () => {
   })
 
   afterAll(() => {
-    client.close()
+    if (available) {
+      client.close()
+    }
   })
 
   describe("beginTransaction", () => {
@@ -31,7 +39,7 @@ describe("Transactions Integration", () => {
 
     afterEach(async () => {
       // Clean up any open transaction
-      if (transaction !== null) {
+      if (transaction !== null && available) {
         try {
           await client.rollback(transaction)
         } catch {
@@ -42,6 +50,10 @@ describe("Transactions Integration", () => {
     })
 
     it("begins a transaction", async () => {
+      if (!available) {
+        return
+      }
+
       transaction = await client.beginTransaction()
 
       expect(transaction.id).toBeDefined()
@@ -49,6 +61,10 @@ describe("Transactions Integration", () => {
     })
 
     it("begins multiple transactions", async () => {
+      if (!available) {
+        return
+      }
+
       const transaction1 = await client.beginTransaction()
       const transaction2 = await client.beginTransaction()
 
@@ -65,6 +81,10 @@ describe("Transactions Integration", () => {
 
   describe("commit and rollback", () => {
     it("commits a transaction", async () => {
+      if (!available) {
+        return
+      }
+
       const transaction = await client.beginTransaction()
 
       // Commit should succeed (even without executing anything)
@@ -72,6 +92,10 @@ describe("Transactions Integration", () => {
     })
 
     it("rolls back a transaction", async () => {
+      if (!available) {
+        return
+      }
+
       const transaction = await client.beginTransaction()
 
       // Rollback should succeed (even without executing anything)
@@ -79,6 +103,10 @@ describe("Transactions Integration", () => {
     })
 
     it("commits a transaction with pending updates", async () => {
+      if (!available) {
+        return
+      }
+
       const transaction = await client.beginTransaction()
 
       // Execute updates within the transaction
@@ -99,6 +127,10 @@ describe("Transactions Integration", () => {
     })
 
     it("rolls back a transaction with pending updates", async () => {
+      if (!available) {
+        return
+      }
+
       const transaction = await client.beginTransaction()
 
       // Execute updates within the transaction
@@ -115,6 +147,10 @@ describe("Transactions Integration", () => {
 
   describe("query within transaction", () => {
     it("executes query within transaction", async () => {
+      if (!available) {
+        return
+      }
+
       const transaction = await client.beginTransaction()
 
       try {

@@ -6,7 +6,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
 import { createFlightClient, type FlightClient, type FlightDescriptorInput } from "../../client"
-import { config } from "./config"
+import { config, isFlightAvailable } from "./config"
 
 /** Convert path segments to a FlightDescriptor. */
 function pathDescriptor(...path: string[]): FlightDescriptorInput {
@@ -15,8 +15,14 @@ function pathDescriptor(...path: string[]): FlightDescriptorInput {
 
 describe("Flight Operations Integration", () => {
   let client: FlightClient
+  let available: boolean
 
   beforeAll(async () => {
+    available = await isFlightAvailable()
+    if (!available) {
+      return
+    }
+
     client = createFlightClient({
       url: config.url,
       auth: {
@@ -28,11 +34,17 @@ describe("Flight Operations Integration", () => {
   })
 
   afterAll(() => {
-    client.close()
+    if (available) {
+      client.close()
+    }
   })
 
   describe("listFlights", () => {
     it("lists available flights", async () => {
+      if (!available) {
+        return
+      }
+
       const flights: unknown[] = []
 
       for await (const info of client.listFlights()) {
@@ -44,6 +56,10 @@ describe("Flight Operations Integration", () => {
     })
 
     it("returns FlightInfo with required fields", async () => {
+      if (!available) {
+        return
+      }
+
       for await (const info of client.listFlights()) {
         // FlightInfo must have a descriptor
         expect(info.flightDescriptor).toBeDefined()
@@ -56,6 +72,10 @@ describe("Flight Operations Integration", () => {
     })
 
     it("filters flights with criteria expression", async () => {
+      if (!available) {
+        return
+      }
+
       const allFlights: unknown[] = []
       for await (const info of client.listFlights()) {
         allFlights.push(info)
@@ -76,6 +96,10 @@ describe("Flight Operations Integration", () => {
 
   describe("getFlightInfo", () => {
     it("gets flight info for test/integers", async () => {
+      if (!available) {
+        return
+      }
+
       const descriptor = pathDescriptor(...config.flights.integers)
       const info = await client.getFlightInfo(descriptor)
 
@@ -87,6 +111,10 @@ describe("Flight Operations Integration", () => {
     })
 
     it("gets flight info for test/strings", async () => {
+      if (!available) {
+        return
+      }
+
       const descriptor = pathDescriptor(...config.flights.strings)
       const info = await client.getFlightInfo(descriptor)
 
@@ -95,6 +123,10 @@ describe("Flight Operations Integration", () => {
     })
 
     it("gets flight info for test/empty", async () => {
+      if (!available) {
+        return
+      }
+
       const descriptor = pathDescriptor(...config.flights.empty)
       const info = await client.getFlightInfo(descriptor)
 
@@ -102,6 +134,10 @@ describe("Flight Operations Integration", () => {
     })
 
     it("gets flight info for test/large", async () => {
+      if (!available) {
+        return
+      }
+
       const descriptor = pathDescriptor(...config.flights.large)
       const info = await client.getFlightInfo(descriptor)
 
@@ -109,6 +145,10 @@ describe("Flight Operations Integration", () => {
     })
 
     it("returns NOT_FOUND for non-existent flight", async () => {
+      if (!available) {
+        return
+      }
+
       const descriptor = pathDescriptor("nonexistent", "flight")
 
       await expect(client.getFlightInfo(descriptor)).rejects.toThrow()
@@ -117,6 +157,10 @@ describe("Flight Operations Integration", () => {
 
   describe("getSchema", () => {
     it("gets schema for test/integers", async () => {
+      if (!available) {
+        return
+      }
+
       const descriptor = pathDescriptor(...config.flights.integers)
       const result = await client.getSchema(descriptor)
 
@@ -125,6 +169,10 @@ describe("Flight Operations Integration", () => {
     })
 
     it("schema matches getFlightInfo schema", async () => {
+      if (!available) {
+        return
+      }
+
       const descriptor = pathDescriptor(...config.flights.strings)
 
       const info = await client.getFlightInfo(descriptor)
@@ -135,6 +183,10 @@ describe("Flight Operations Integration", () => {
     })
 
     it("returns error for non-existent flight", async () => {
+      if (!available) {
+        return
+      }
+
       const descriptor = pathDescriptor("does", "not", "exist")
 
       await expect(client.getSchema(descriptor)).rejects.toThrow()

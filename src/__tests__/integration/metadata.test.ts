@@ -6,12 +6,18 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
 import { createFlightSqlClient, type FlightSqlClient } from "../../client"
-import { config } from "./config"
+import { config, isFlightAvailable } from "./config"
 
 describe("Metadata Integration", () => {
   let client: FlightSqlClient
+  let available: boolean
 
   beforeAll(async () => {
+    available = await isFlightAvailable()
+    if (!available) {
+      return
+    }
+
     // Use bearer token auth if available, otherwise basic auth
     const auth =
       config.bearerToken !== undefined
@@ -30,11 +36,17 @@ describe("Metadata Integration", () => {
   })
 
   afterAll(() => {
-    client.close()
+    if (available) {
+      client.close()
+    }
   })
 
   describe("getCatalogs", () => {
     it("returns a table with catalog_name column", async () => {
+      if (!available) {
+        return
+      }
+
       const catalogs = await client.getCatalogs()
 
       expect(catalogs).toBeDefined()
@@ -44,6 +56,10 @@ describe("Metadata Integration", () => {
     })
 
     it("returns at least one catalog", async () => {
+      if (!available) {
+        return
+      }
+
       const catalogs = await client.getCatalogs()
 
       expect(catalogs.numRows).toBeGreaterThanOrEqual(1)
@@ -52,6 +68,10 @@ describe("Metadata Integration", () => {
 
   describe("getDbSchemas", () => {
     it("returns a table with schema columns", async () => {
+      if (!available) {
+        return
+      }
+
       const schemas = await client.getDbSchemas()
 
       expect(schemas).toBeDefined()
@@ -60,6 +80,10 @@ describe("Metadata Integration", () => {
     })
 
     it("filters by catalog", async () => {
+      if (!available) {
+        return
+      }
+
       const schemas = await client.getDbSchemas({ catalog: config.catalog })
 
       expect(schemas).toBeDefined()
@@ -68,6 +92,10 @@ describe("Metadata Integration", () => {
 
   describe("getTables", () => {
     it("returns a table with table columns", async () => {
+      if (!available) {
+        return
+      }
+
       const tables = await client.getTables()
 
       expect(tables).toBeDefined()
@@ -77,18 +105,30 @@ describe("Metadata Integration", () => {
     })
 
     it("returns test tables", async () => {
+      if (!available) {
+        return
+      }
+
       const tables = await client.getTables()
 
       expect(tables.numRows).toBeGreaterThan(0)
     })
 
     it("filters by table type", async () => {
+      if (!available) {
+        return
+      }
+
       const tables = await client.getTables({ tableTypes: ["TABLE"] })
 
       expect(tables).toBeDefined()
     })
 
     it("filters by table name pattern", async () => {
+      if (!available) {
+        return
+      }
+
       const tables = await client.getTables({ tableNameFilterPattern: "integers" })
 
       expect(tables).toBeDefined()
@@ -99,6 +139,10 @@ describe("Metadata Integration", () => {
 
   describe("getTableTypes", () => {
     it("returns a table with table_type column", async () => {
+      if (!available) {
+        return
+      }
+
       const tableTypes = await client.getTableTypes()
 
       expect(tableTypes).toBeDefined()
@@ -107,6 +151,10 @@ describe("Metadata Integration", () => {
     })
 
     it("returns at least TABLE type", async () => {
+      if (!available) {
+        return
+      }
+
       const tableTypes = await client.getTableTypes()
 
       expect(tableTypes.numRows).toBeGreaterThanOrEqual(1)
@@ -115,6 +163,10 @@ describe("Metadata Integration", () => {
 
   describe("getPrimaryKeys", () => {
     it("returns primary key information for a table", async () => {
+      if (!available) {
+        return
+      }
+
       const keys = await client.getPrimaryKeys("integers", {
         catalog: config.catalog,
         dbSchema: "test"

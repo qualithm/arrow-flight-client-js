@@ -7,6 +7,8 @@
  * - FLIGHT_TLS: Enable TLS (default: false)
  */
 
+import { createConnection } from "node:net"
+
 const host = process.env.FLIGHT_HOST ?? "localhost"
 const port = parseInt(process.env.FLIGHT_PORT ?? "50051", 10)
 const tls = process.env.FLIGHT_TLS === "true"
@@ -53,9 +55,26 @@ export const config = {
 } as const
 
 /**
- * Checks if the Arrow Flight server is likely available.
- * This is a basic check - actual availability is confirmed by connection.
+ * Check if Flight server is reachable by attempting a TCP connection.
+ * Returns true if the server accepts a connection within the timeout.
  */
-export function isServerConfigured(): boolean {
-  return config.host !== "" && config.port > 0
+export async function isFlightAvailable(timeoutMs = 3000): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = createConnection({ host: config.host, port: config.port, timeout: timeoutMs })
+
+    socket.on("connect", () => {
+      socket.destroy()
+      resolve(true)
+    })
+
+    socket.on("timeout", () => {
+      socket.destroy()
+      resolve(false)
+    })
+
+    socket.on("error", () => {
+      socket.destroy()
+      resolve(false)
+    })
+  })
 }

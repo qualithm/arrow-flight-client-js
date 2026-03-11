@@ -6,12 +6,18 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
 import { createFlightSqlClient, type FlightSqlClient } from "../../client"
-import { config } from "./config"
+import { config, isFlightAvailable } from "./config"
 
 describe("Update Integration", () => {
   let client: FlightSqlClient
+  let available: boolean
 
   beforeAll(async () => {
+    available = await isFlightAvailable()
+    if (!available) {
+      return
+    }
+
     client = createFlightSqlClient({
       url: config.url,
       auth: {
@@ -23,11 +29,17 @@ describe("Update Integration", () => {
   })
 
   afterAll(() => {
-    client.close()
+    if (available) {
+      client.close()
+    }
   })
 
   describe("executeUpdate", () => {
     it("executes INSERT statement", async () => {
+      if (!available) {
+        return
+      }
+
       const result = await client.executeUpdate(
         `INSERT INTO ${config.tables.integers} (id, value) VALUES (999, 1)`
       )
@@ -37,6 +49,10 @@ describe("Update Integration", () => {
     })
 
     it("executes UPDATE statement", async () => {
+      if (!available) {
+        return
+      }
+
       const result = await client.executeUpdate(
         `UPDATE ${config.tables.integers} SET value = 42 WHERE id = 999`
       )
@@ -45,6 +61,10 @@ describe("Update Integration", () => {
     })
 
     it("executes DELETE statement", async () => {
+      if (!available) {
+        return
+      }
+
       const result = await client.executeUpdate(
         `DELETE FROM ${config.tables.integers} WHERE id = 999`
       )
@@ -53,6 +73,10 @@ describe("Update Integration", () => {
     })
 
     it("returns error for invalid SQL", async () => {
+      if (!available) {
+        return
+      }
+
       await expect(client.executeUpdate("INVALID UPDATE")).rejects.toThrow()
     })
   })
@@ -61,6 +85,10 @@ describe("Update Integration", () => {
     let readerClient: FlightSqlClient
 
     beforeAll(async () => {
+      if (!available) {
+        return
+      }
+
       readerClient = createFlightSqlClient({
         url: config.url,
         auth: {
@@ -72,10 +100,16 @@ describe("Update Integration", () => {
     })
 
     afterAll(() => {
-      readerClient.close()
+      if (available) {
+        readerClient.close()
+      }
     })
 
     it("rejects INSERT with permission error", async () => {
+      if (!available) {
+        return
+      }
+
       await expect(
         readerClient.executeUpdate(
           `INSERT INTO ${config.tables.integers} (id, value) VALUES (999, 1)`

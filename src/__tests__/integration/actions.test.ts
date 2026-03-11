@@ -7,12 +7,18 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
 import { createFlightClient, type FlightClient } from "../../client"
 import type { ActionType, Result } from "../../gen/arrow/flight/Flight_pb"
-import { config } from "./config"
+import { config, isFlightAvailable } from "./config"
 
 describe("Actions Integration", () => {
   let client: FlightClient
+  let available: boolean
 
   beforeAll(async () => {
+    available = await isFlightAvailable()
+    if (!available) {
+      return
+    }
+
     client = createFlightClient({
       url: config.url,
       auth: {
@@ -24,11 +30,17 @@ describe("Actions Integration", () => {
   })
 
   afterAll(() => {
-    client.close()
+    if (available) {
+      client.close()
+    }
   })
 
   describe("listActions", () => {
     it("lists available actions", async () => {
+      if (!available) {
+        return
+      }
+
       const actions: ActionType[] = []
 
       for await (const action of client.listActions()) {
@@ -40,6 +52,10 @@ describe("Actions Integration", () => {
     })
 
     it("returns action descriptions", async () => {
+      if (!available) {
+        return
+      }
+
       for await (const action of client.listActions()) {
         expect(action.type).toBeDefined()
         expect(action.type.length).toBeGreaterThan(0)
@@ -51,6 +67,10 @@ describe("Actions Integration", () => {
 
   describe("doAction", () => {
     it("executes healthcheck action", async () => {
+      if (!available) {
+        return
+      }
+
       const results: Result[] = []
 
       for await (const result of client.doAction({
@@ -68,6 +88,10 @@ describe("Actions Integration", () => {
     })
 
     it("executes echo action", async () => {
+      if (!available) {
+        return
+      }
+
       const testPayload = new TextEncoder().encode("Hello, Flight!")
       const results: Result[] = []
 
@@ -84,6 +108,10 @@ describe("Actions Integration", () => {
     })
 
     it("error action returns error", async () => {
+      if (!available) {
+        return
+      }
+
       await expect(
         (async () => {
           for await (const _ of client.doAction({
@@ -97,6 +125,10 @@ describe("Actions Integration", () => {
     })
 
     it("returns error for unknown action", async () => {
+      if (!available) {
+        return
+      }
+
       await expect(
         (async () => {
           for await (const _ of client.doAction({

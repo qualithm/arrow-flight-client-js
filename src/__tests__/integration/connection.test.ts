@@ -9,13 +9,18 @@
  * bun test src/__tests__/integration
  * ```
  */
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, beforeAll, describe, expect, it } from "vitest"
 
 import { createFlightClient, FlightClient } from "../../client"
-import { config } from "./config"
+import { config, isFlightAvailable } from "./config"
 
 describe("FlightClient Integration", () => {
   let client: FlightClient | null = null
+  let available: boolean
+
+  beforeAll(async () => {
+    available = await isFlightAvailable()
+  })
 
   afterEach(() => {
     if (client !== null) {
@@ -50,6 +55,10 @@ describe("FlightClient Integration", () => {
 
   describe("handshake", () => {
     it("performs basic auth handshake with valid credentials", async () => {
+      if (!available) {
+        return
+      }
+
       client = new FlightClient({
         url: config.url,
         auth: {
@@ -66,6 +75,10 @@ describe("FlightClient Integration", () => {
     })
 
     it("performs handshake with reader credentials", async () => {
+      if (!available) {
+        return
+      }
+
       client = new FlightClient({
         url: config.url,
         auth: {
@@ -81,6 +94,10 @@ describe("FlightClient Integration", () => {
     })
 
     it("rejects invalid credentials", async () => {
+      if (!available) {
+        return
+      }
+
       client = new FlightClient({
         url: config.url,
         auth: {
@@ -93,6 +110,10 @@ describe("FlightClient Integration", () => {
     })
 
     it("authenticates with basic auth via authenticate()", async () => {
+      if (!available) {
+        return
+      }
+
       client = new FlightClient({
         url: config.url,
         auth: {
