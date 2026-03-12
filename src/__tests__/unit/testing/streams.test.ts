@@ -150,11 +150,13 @@ describe("testing/streams", () => {
       const items = [1, 2]
       const result: number[] = []
 
-      await expect(async () => {
-        for await (const item of errorAfter(items, new Error("test"))) {
-          result.push(item)
-        }
-      }).rejects.toThrow("test")
+      await expect(
+        (async () => {
+          for await (const item of errorAfter(items, new Error("test"))) {
+            result.push(item)
+          }
+        })()
+      ).rejects.toThrow("test")
 
       expect(result).toEqual([1, 2])
     })
@@ -162,21 +164,25 @@ describe("testing/streams", () => {
     it("throws the provided error", async () => {
       const error = new Error("custom error")
 
-      await expect(async () => {
-        for await (const _ of errorAfter([], error)) {
-          // Won't execute
-        }
-      }).rejects.toThrow("custom error")
+      await expect(
+        (async () => {
+          for await (const _ of errorAfter([], error)) {
+            // Won't execute
+          }
+        })()
+      ).rejects.toThrow("custom error")
     })
 
     it("handles empty items array", async () => {
       const result: unknown[] = []
 
-      await expect(async () => {
-        for await (const item of errorAfter([], new Error("error"))) {
-          result.push(item)
-        }
-      }).rejects.toThrow()
+      await expect(
+        (async () => {
+          for await (const item of errorAfter([], new Error("error"))) {
+            result.push(item)
+          }
+        })()
+      ).rejects.toThrow()
 
       expect(result).toEqual([])
     })

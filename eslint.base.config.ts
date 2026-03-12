@@ -243,16 +243,13 @@ export default defineConfig([
   },
 
   // ---------------------------------------------------------------------------
-  // Scripts, Benchmarks & Examples
+  // Scripts & Migrations
   // ---------------------------------------------------------------------------
   {
     name: "scripts-overrides",
-    files: ["**/scripts/**/*.{ts,tsx}", "**/benchmarks/**/*.{ts,tsx}", "**/examples/**/*.{ts,tsx}"],
+    files: ["**/scripts/**/*.{ts,tsx}", "**/migrations/**/*.{ts,tsx}"],
     rules: {
-      "no-console": "off",
-      "@typescript-eslint/strict-boolean-expressions": "off",
-      "@typescript-eslint/explicit-function-return-type": "off",
-      "@typescript-eslint/no-unnecessary-condition": "off"
+      "no-console": "off"
     }
   },
 

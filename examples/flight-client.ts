@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /**
  * FlightClient usage example.
  *
@@ -22,6 +23,7 @@ import {
   decodeFlightDataToTable,
   encodeTableToFlightData,
   FlightConnectionError,
+  type FlightData,
   FlightError
 } from "@qualithm/arrow-flight-client"
 import { tableFromArrays } from "apache-arrow"
@@ -44,7 +46,7 @@ const url = `${tls ? "https" : "http"}://${host}:${String(port)}`
 const client = createFlightClient({
   url,
   // Bearer token authentication
-  auth: bearerToken ? { type: "bearer", token: bearerToken } : undefined
+  auth: bearerToken !== undefined ? { type: "bearer", token: bearerToken } : undefined
 })
 
 console.log(`Connected to: ${url}`)
@@ -58,7 +60,7 @@ async function listFlights(): Promise<void> {
 
   try {
     for await (const info of client.listFlights()) {
-      const name = info.flightDescriptor?.path?.join("/") ?? "unknown"
+      const name = info.flightDescriptor?.path.join("/") ?? "unknown"
       console.log(`Flight: ${name}`)
       console.log(`  Records: ${String(info.totalRecords)}`)
       console.log(`  Bytes: ${String(info.totalBytes)}`)
@@ -108,7 +110,7 @@ async function fetchData(): Promise<void> {
       path: ["example", "dataset"]
     })
 
-    if (info.endpoint.length === 0 || !info.endpoint[0].ticket) {
+    if (info.endpoint.length === 0 || info.endpoint[0].ticket === undefined) {
       console.log("No data available")
       return
     }
@@ -155,7 +157,7 @@ async function uploadData(): Promise<void> {
     // Add descriptor to first message for upload
     const descriptor = { type: 1, path: ["uploads", "scores"], cmd: new Uint8Array() } // type: 1 = PATH
 
-    async function* withDescriptor() {
+    async function* withDescriptor(): AsyncGenerator<FlightData> {
       let first = true
       for await (const data of flightData) {
         if (first) {

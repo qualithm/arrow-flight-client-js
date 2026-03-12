@@ -159,7 +159,7 @@ describe("Data Operations Integration", () => {
       // Create FlightData stream with descriptor
       async function* createPutStream(): AsyncGenerator<FlightData> {
         for (let i = 0; i < sourceChunks.length; i++) {
-          const data = sourceChunks[i]
+          const data = await Promise.resolve(sourceChunks[i])
           if (i === 0) {
             // First message includes descriptor - use create() for proper proto message
             yield create(FlightDataSchema, {

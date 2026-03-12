@@ -1,5 +1,5 @@
 import { create, toBinary } from "@bufbuild/protobuf"
-import { tableFromArrays } from "apache-arrow"
+import { type RecordBatch, type Table, tableFromArrays } from "apache-arrow"
 import { describe, expect, it, vi } from "vitest"
 
 import { FlightError } from "../../../client/errors.js"
@@ -16,12 +16,12 @@ import {
 // Helper to create async iterables for testing
 async function* asyncIterable<T>(items: T[]): AsyncIterable<T> {
   for (const item of items) {
-    yield item
+    yield await Promise.resolve(item)
   }
 }
 
 // Helper to create a test table
-function createTestTable() {
+function createTestTable(): Table {
   return tableFromArrays({
     id: new Int32Array([1, 2, 3]),
     name: ["Alice", "Bob", "Charlie"]
@@ -52,7 +52,7 @@ function createMockFlightInfo(ticketBytes = new Uint8Array([1, 2, 3])): FlightIn
 }
 
 // Helper to create a mock prepared statement response
-function createMockPreparedStatementResponse() {
+function createMockPreparedStatementResponse(): { body: Uint8Array } {
   const msg = create(ActionCreatePreparedStatementResultSchema, {
     preparedStatementHandle: new Uint8Array([1, 2, 3, 4]),
     datasetSchema: new Uint8Array(),
@@ -63,14 +63,14 @@ function createMockPreparedStatementResponse() {
 }
 
 // Helper to create a mock update result response
-function createMockUpdateResult(recordCount: bigint) {
+function createMockUpdateResult(recordCount: bigint): { appMetadata: Uint8Array } {
   const msg = create(DoPutUpdateResultSchema, { recordCount })
   const result = toBinary(DoPutUpdateResultSchema, msg)
   return { appMetadata: result }
 }
 
 // Helper to create a mock transaction response
-function createMockTransactionResponse() {
+function createMockTransactionResponse(): { body: Uint8Array } {
   const msg = create(ActionBeginTransactionResultSchema, {
     transactionId: new Uint8Array([10, 20, 30, 40])
   })
@@ -540,12 +540,12 @@ describe("FlightSqlClient", () => {
       // This exercises the withDescriptor generator path
       const paramTable1 = createTestTable()
       const paramTable2 = createTestTable()
-      async function* asyncParams() {
+      async function* asyncParams(): AsyncGenerator<RecordBatch> {
         for (const batch of paramTable1.batches) {
-          yield batch
+          yield await Promise.resolve(batch)
         }
         for (const batch of paramTable2.batches) {
-          yield batch
+          yield await Promise.resolve(batch)
         }
       }
 

@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /**
  * FlightSqlClient usage example.
  *
@@ -41,7 +42,7 @@ const url = `${tls ? "https" : "http"}://${host}:${String(port)}`
 
 const client = createFlightSqlClient({
   url,
-  auth: bearerToken ? { type: "bearer", token: bearerToken } : undefined
+  auth: bearerToken !== undefined ? { type: "bearer", token: bearerToken } : undefined
 })
 
 console.log(`Connected to: ${url}`)

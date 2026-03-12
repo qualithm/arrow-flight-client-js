@@ -40,6 +40,8 @@
     "PutResult"
   ],
   "requiredToBeDocumented": [
+    "Enum",
+    "EnumMember",
     "Variable",
     "Function",
     "Class",

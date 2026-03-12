@@ -50,7 +50,8 @@ vi.mock("@bufbuild/protobuf", () => ({
 // Mock the generated proto module to avoid @bufbuild/protobuf import issues
 vi.mock("../../../gen/arrow/flight/Flight_pb.js", () => ({
   FlightService: {},
-  BasicAuthSchema: {}
+  BasicAuthSchema: {},
+  FlightDescriptorSchema: {}
 }))
 
 // Import after mocks are set up
@@ -59,7 +60,7 @@ const { FlightClient } = await import("../../../client/flight-client.js")
 // Helper to create async iterables for testing
 async function* asyncIterable<T>(items: T[]): AsyncIterable<T> {
   for (const item of items) {
-    yield item
+    yield await Promise.resolve(item)
   }
 }
 

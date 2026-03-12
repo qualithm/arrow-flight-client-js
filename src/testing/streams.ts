@@ -22,9 +22,9 @@
  * }
  * ```
  */
-export async function* asyncIterable<T>(items: T[]): AsyncIterable<T> {
+export async function* asyncIterable<T>(items: T[]): AsyncGenerator<T> {
   for (const item of items) {
-    yield item
+    yield await Promise.resolve(item)
   }
 }
 
@@ -109,9 +109,9 @@ export async function* delayedIterable<T>(items: T[], delayMs: number): AsyncIte
  * // Yields data1, then throws Error
  * ```
  */
-export async function* errorAfter<T>(items: T[], error: Error): AsyncIterable<T> {
+export async function* errorAfter<T>(items: T[], error: Error): AsyncGenerator<T> {
   for (const item of items) {
-    yield item
+    yield await Promise.resolve(item)
   }
   throw error
 }

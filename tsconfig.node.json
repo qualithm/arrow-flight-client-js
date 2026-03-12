@@ -13,6 +13,7 @@
     "skipLibCheck": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
     "baseUrl": ".",
@@ -20,13 +21,6 @@
       "@qualithm/arrow-flight-client": ["./src/index.ts"]
     }
   },
-  "include": [
-    "eslint*.config.ts",
-    "vitest.config.ts",
-    "scripts",
-    "bench",
-    "examples",
-    "src/**/*.ts"
-  ],
+  "include": ["eslint*.config.ts", "vitest*.config.ts", "src", "scripts", "bench", "examples"],
   "exclude": ["src/gen/**"]
 }

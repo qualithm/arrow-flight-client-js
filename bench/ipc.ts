@@ -230,7 +230,7 @@ async function collectFlightData(
  */
 async function* asyncIterable<T>(items: T[]): AsyncIterable<T> {
   for (const item of items) {
-    yield item
+    yield await Promise.resolve(item)
   }
 }
 

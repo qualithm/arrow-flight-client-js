@@ -1,8 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
-// Disabled due to generated proto types using @ts-nocheck
-
 import { create, toBinary } from "@bufbuild/protobuf"
-import { createClient } from "@connectrpc/connect"
+import { type Client, createClient } from "@connectrpc/connect"
 import { createGrpcTransport } from "@connectrpc/connect-node"
 
 import {
@@ -10,6 +7,7 @@ import {
   BasicAuthSchema,
   type FlightData,
   type FlightDescriptor,
+  FlightDescriptorSchema,
   type FlightInfo,
   FlightService,
   type HandshakeResponse,
@@ -49,7 +47,7 @@ import {
  */
 export class FlightClient {
   readonly #options: ResolvedFlightClientOptions
-  readonly #client: any
+  readonly #client: Client<typeof FlightService>
   #closed = false
   #authenticated = false
   #authToken: string | undefined
@@ -132,10 +130,10 @@ export class FlightClient {
         void,
         unknown
       > {
-        yield {
+        yield await Promise.resolve({
           protocolVersion: 0n,
           payload: handshakePayload
-        }
+        })
       }
 
       const stream = this.#client.handshake(requests(), {
@@ -395,11 +393,11 @@ export class FlightClient {
   }
 
   /** Converts a FlightDescriptorInput to the proto FlightDescriptor format. */
-  #toFlightDescriptor(input: FlightDescriptorInput): Partial<FlightDescriptor> {
+  #toFlightDescriptor(input: FlightDescriptorInput): FlightDescriptor {
     if (input.type === "path") {
-      return { type: 1, path: input.path } // PATH = 1
+      return create(FlightDescriptorSchema, { type: 1, path: input.path }) // PATH = 1
     }
-    return { type: 2, cmd: input.cmd } // CMD = 2
+    return create(FlightDescriptorSchema, { type: 2, cmd: input.cmd }) // CMD = 2
   }
 
   /** Builds Node.js HTTP/2 options including TLS configuration. */

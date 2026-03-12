@@ -13,4 +13,4 @@ plugins:
   - local: protoc-gen-es
     out: src/gen
     opt:
-      - target=ts
+      - target=js+dts

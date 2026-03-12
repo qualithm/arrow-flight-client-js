@@ -464,7 +464,7 @@ export class FlightSqlClient {
 
     // Create empty FlightData stream with descriptor
     async function* emptyStream(): AsyncGenerator<FlightData> {
-      yield {
+      yield (await Promise.resolve({
         flightDescriptor: {
           type: 2, // CMD
           cmd: cmdBytes,
@@ -473,7 +473,7 @@ export class FlightSqlClient {
         dataHeader: new Uint8Array(),
         dataBody: new Uint8Array(),
         appMetadata: new Uint8Array()
-      } as unknown as FlightData
+      })) as unknown as FlightData
     }
 
     // Execute DoPut and collect result
@@ -891,7 +891,7 @@ export class FlightSqlClient {
     // Convert to async iterable for decoding
     async function* toAsyncIterable(items: FlightData[]): AsyncIterable<FlightData> {
       for (const item of items) {
-        yield item
+        yield await Promise.resolve(item)
       }
     }
 
@@ -923,11 +923,11 @@ export class FlightSqlClient {
 
   /** Creates an empty FlightData stream with only a descriptor (for updates). */
   async *#createEmptyStream(cmdBytes: Uint8Array): AsyncGenerator<FlightData> {
-    yield {
+    yield await Promise.resolve({
       flightDescriptor: { type: 2, cmd: cmdBytes, path: [] },
       dataHeader: new Uint8Array(),
       dataBody: new Uint8Array(),
       appMetadata: new Uint8Array()
-    } as unknown as FlightData
+    } as unknown as FlightData)
   }
 }
