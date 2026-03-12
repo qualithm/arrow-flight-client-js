@@ -55,7 +55,7 @@
     "bench:ipc": "bun run bench/ipc.ts",
     "bench": "bun run bench/index.ts",
     "build:watch": "tsc -p tsconfig.build.json --watch",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && cp -r src/gen dist/gen",
     "clean": "rm -rf dist",
     "dev": "bun --watch run src/index.ts",
     "docs": "typedoc",
