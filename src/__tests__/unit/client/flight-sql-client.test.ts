@@ -14,7 +14,6 @@ import {
 } from "../../../gen/arrow/flight/FlightSql_pb.js"
 
 // Helper to create async iterables for testing
-// eslint-disable-next-line @typescript-eslint/require-await
 async function* asyncIterable<T>(items: T[]): AsyncIterable<T> {
   for (const item of items) {
     yield item
@@ -22,7 +21,6 @@ async function* asyncIterable<T>(items: T[]): AsyncIterable<T> {
 }
 
 // Helper to create a test table
-// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 function createTestTable() {
   return tableFromArrays({
     id: new Int32Array([1, 2, 3]),
@@ -54,7 +52,6 @@ function createMockFlightInfo(ticketBytes = new Uint8Array([1, 2, 3])): FlightIn
 }
 
 // Helper to create a mock prepared statement response
-// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 function createMockPreparedStatementResponse() {
   const msg = create(ActionCreatePreparedStatementResultSchema, {
     preparedStatementHandle: new Uint8Array([1, 2, 3, 4]),
@@ -66,7 +63,6 @@ function createMockPreparedStatementResponse() {
 }
 
 // Helper to create a mock update result response
-// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 function createMockUpdateResult(recordCount: bigint) {
   const msg = create(DoPutUpdateResultSchema, { recordCount })
   const result = toBinary(DoPutUpdateResultSchema, msg)
@@ -74,7 +70,6 @@ function createMockUpdateResult(recordCount: bigint) {
 }
 
 // Helper to create a mock transaction response
-// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 function createMockTransactionResponse() {
   const msg = create(ActionBeginTransactionResultSchema, {
     transactionId: new Uint8Array([10, 20, 30, 40])
@@ -545,7 +540,6 @@ describe("FlightSqlClient", () => {
       // This exercises the withDescriptor generator path
       const paramTable1 = createTestTable()
       const paramTable2 = createTestTable()
-      // eslint-disable-next-line @typescript-eslint/require-await, @typescript-eslint/explicit-function-return-type
       async function* asyncParams() {
         for (const batch of paramTable1.batches) {
           yield batch

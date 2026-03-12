@@ -22,7 +22,6 @@
  * }
  * ```
  */
-// eslint-disable-next-line @typescript-eslint/require-await
 export async function* asyncIterable<T>(items: T[]): AsyncIterable<T> {
   for (const item of items) {
     yield item
@@ -110,7 +109,6 @@ export async function* delayedIterable<T>(items: T[], delayMs: number): AsyncIte
  * // Yields data1, then throws Error
  * ```
  */
-// eslint-disable-next-line @typescript-eslint/require-await
 export async function* errorAfter<T>(items: T[], error: Error): AsyncIterable<T> {
   for (const item of items) {
     yield item

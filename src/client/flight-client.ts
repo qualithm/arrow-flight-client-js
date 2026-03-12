@@ -49,7 +49,6 @@ import {
  */
 export class FlightClient {
   readonly #options: ResolvedFlightClientOptions
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Generated proto types use @ts-nocheck
   readonly #client: any
   #closed = false
   #authenticated = false
@@ -128,7 +127,6 @@ export class FlightClient {
 
     try {
       // Create async iterable with single handshake request
-      // eslint-disable-next-line @typescript-eslint/require-await
       const requests = async function* (): AsyncGenerator<
         { protocolVersion: bigint; payload: Uint8Array },
         void,

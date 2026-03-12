@@ -21,7 +21,6 @@ function createTestTable(): Table {
 }
 
 // Helper to create an async iterable from an array
-// eslint-disable-next-line @typescript-eslint/require-await
 async function* asyncIterable<T>(items: T[]): AsyncIterable<T> {
   for (const item of items) {
     yield item

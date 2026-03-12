@@ -157,7 +157,6 @@ describe("Data Operations Integration", () => {
       }
 
       // Create FlightData stream with descriptor
-      // eslint-disable-next-line @typescript-eslint/require-await
       async function* createPutStream(): AsyncGenerator<FlightData> {
         for (let i = 0; i < sourceChunks.length; i++) {
           const data = sourceChunks[i]

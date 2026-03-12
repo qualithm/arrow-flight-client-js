@@ -57,7 +57,6 @@ vi.mock("../../../gen/arrow/flight/Flight_pb.js", () => ({
 const { FlightClient } = await import("../../../client/flight-client.js")
 
 // Helper to create async iterables for testing
-// eslint-disable-next-line @typescript-eslint/require-await
 async function* asyncIterable<T>(items: T[]): AsyncIterable<T> {
   for (const item of items) {
     yield item

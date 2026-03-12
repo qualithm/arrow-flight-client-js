@@ -463,7 +463,6 @@ export class FlightSqlClient {
     // For updates, we use DoPut with the command as descriptor
 
     // Create empty FlightData stream with descriptor
-    // eslint-disable-next-line @typescript-eslint/require-await
     async function* emptyStream(): AsyncGenerator<FlightData> {
       yield {
         flightDescriptor: {
@@ -890,7 +889,6 @@ export class FlightSqlClient {
     }
 
     // Convert to async iterable for decoding
-    // eslint-disable-next-line @typescript-eslint/require-await
     async function* toAsyncIterable(items: FlightData[]): AsyncIterable<FlightData> {
       for (const item of items) {
         yield item
@@ -924,7 +922,6 @@ export class FlightSqlClient {
   }
 
   /** Creates an empty FlightData stream with only a descriptor (for updates). */
-  // eslint-disable-next-line @typescript-eslint/require-await
   async *#createEmptyStream(cmdBytes: Uint8Array): AsyncGenerator<FlightData> {
     yield {
       flightDescriptor: { type: 2, cmd: cmdBytes, path: [] },
