@@ -1,7 +1,6 @@
 # CONTEXT.md
 
-> **This is the single source of truth for this repository.** When CONTEXT.md conflicts with any
-> other document, CONTEXT.md is correct.
+> **Single source of truth.** CONTEXT.md > Code > README > Comments.
 
 ---
 
@@ -41,6 +40,18 @@ complete gRPC client for Apache Arrow Flight and Flight SQL protocols.
 | ---------- | ---------------------------------------------------------------- |
 | `index.ts` | Main entry point                                                 |
 | `client/`  | FlightClient, FlightSqlClient, errors, types, factory, IPC utils |
+| `testing/` | Test helpers, builders, descriptors, streams                     |
+
+### Features
+
+| Feature            | Notes                                                        |
+| ------------------ | ------------------------------------------------------------ |
+| Flight RPC methods | FlightClient base + doGet/doPut                              |
+| Flight SQL         | Query, prepared statements, transactions, metadata           |
+| Arrow IPC          | Encode/decode via apache-arrow; tableFromArrays, RecordBatch |
+| Authentication     | Bearer tokens, mTLS, Handshake                               |
+| Integration tests  | Flight RPC and Flight SQL                                    |
+| Cross-runtime      | Bun, Node.js, Deno                                           |
 
 ### File Structure
 
@@ -54,17 +65,6 @@ complete gRPC client for Apache Arrow Flight and Flight SQL protocols.
 | `src/`        | Source code                              |
 | `src/client/` | FlightClient implementation              |
 | `src/gen/`    | Generated proto TypeScript (buf)         |
-
-### Features
-
-| Feature            | Status      | Notes                                                         |
-| ------------------ | ----------- | ------------------------------------------------------------- |
-| Flight RPC methods | Implemented | FlightClient base + doGet/doPut (133 tests)                   |
-| Flight SQL         | Implemented | Query, prepared statements, transactions, metadata (31 tests) |
-| Arrow IPC          | Implemented | Encode/decode via apache-arrow; tableFromArrays, RecordBatch  |
-| Authentication     | Implemented | Bearer tokens, mTLS (TLS options), Handshake (BasicAuth)      |
-| Integration tests  | Implemented | Env-based config; tests for Flight RPC and Flight SQL         |
-| Cross-runtime      | Validated   | Bun, Node.js 22+, Deno (with import map)                      |
 
 ---
 
@@ -116,67 +116,3 @@ complete gRPC client for Apache Arrow Flight and Flight SQL protocols.
 ---
 
 ## Work Queue
-
-### Core Protocol
-
-- [x] Vendor Flight.proto and FlightSql.proto from apache/arrow
-- [x] Set up buf code generation with ConnectRPC
-- [x] Implement FlightClient base class with connection management
-- [x] Implement authentication (Bearer tokens, mTLS, Handshake)
-- [x] Implement Arrow IPC stream encoding/decoding
-
-Acceptance: All core Flight RPC methods operational against a test server
-
-### Flight SQL
-
-- [x] Implement SQL query execution
-- [x] Implement prepared statement management
-- [x] Implement transaction support
-- [x] Implement database metadata queries
-
-Acceptance: All Flight SQL commands and actions functional
-
-### Integration Testing
-
-- [x] Create integration test infrastructure with environment-based config
-- [x] FlightClient tests: connection, handshake, listFlights, getFlightInfo, getSchema, doGet,
-      doPut, doAction, listActions
-- [x] FlightSqlClient tests: queries, updates, prepared statements, transactions, metadata
-
-Acceptance: Integration tests runnable via `bun test:integration` against any compliant Flight SQL
-server
-
-### Benchmarks
-
-- [x] Create benchmark infrastructure with warmup and statistics
-- [x] Benchmark Arrow IPC encoding/decoding (read + write)
-- [x] Benchmark column type performance (Int32, Float64, String, Mixed)
-- [x] Benchmark round-trip operations (encode + decode)
-- [x] Benchmark FlightClient reads (listFlights, getFlightInfo, doGet)
-- [x] Benchmark FlightClient writes (doPut)
-- [x] Benchmark FlightSqlClient reads (query, prepared statements, metadata)
-- [x] Benchmark FlightSqlClient writes (executeUpdate INSERT/UPDATE/DELETE)
-
-Acceptance: `bun run bench` produces server metrics (reads + writes); `bun run bench:ipc` produces
-IPC metrics
-
-### Documentation
-
-- [x] Generate TypeDoc API documentation
-- [x] Create usage examples for FlightClient
-- [x] Create usage examples for FlightSqlClient
-- [x] Update README with comprehensive usage guide
-
-Acceptance: Complete API docs and runnable examples for all major features
-
-### Cross-Runtime & Quality
-
-- [x] Cross-runtime validation script (Bun, Node.js, Deno)
-- [x] Remove legacy greet.ts module
-- [x] Update examples to use package imports
-- [x] Bundle size analysis script
-- [x] Server compatibility documentation
-- [x] Deno import map configuration (deno.json)
-
-Acceptance: `bun run validate:runtime` passes for all runtimes; `bun run analyze:bundle` shows
-tree-shaking impact
