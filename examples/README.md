@@ -1,24 +1,24 @@
 # Examples
 
-This directory contains runnable examples demonstrating Arrow Flight client usage.
+Runnable examples demonstrating Arrow Flight client usage.
 
 ## Prerequisites
 
-Examples require a running Arrow Flight or Flight SQL server. Configure connection via environment
-variables:
+Examples require a running Arrow Flight or Flight SQL server.
 
-- `FLIGHT_HOST`: Server host (default: `localhost`)
-- `FLIGHT_PORT`: Server port (default: `50051`)
-- `FLIGHT_TLS`: Enable TLS (default: `false`)
-- `FLIGHT_BEARER_TOKEN`: Bearer token for authentication (optional)
+## Environment Variables
+
+| Variable              | Default     | Description                     |
+| --------------------- | ----------- | ------------------------------- |
+| `FLIGHT_HOST`         | `localhost` | Server host                     |
+| `FLIGHT_PORT`         | `50051`     | Server port                     |
+| `FLIGHT_TLS`          | `false`     | Enable TLS                      |
+| `FLIGHT_BEARER_TOKEN` | —           | Bearer token for authentication |
 
 ## Running Examples
 
 ```bash
-# FlightClient - core Flight RPC operations
 bun run examples/flight-client.ts
-
-# FlightSqlClient - SQL queries, transactions, metadata
 bun run examples/flight-sql-client.ts
 ```
 
