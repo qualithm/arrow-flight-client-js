@@ -25,6 +25,31 @@ npm install @qualithm/arrow-flight-client
 
 ## Quick Start
 
+```ts
+import { createFlightClient, decodeFlightDataToTable } from "@qualithm/arrow-flight-client"
+
+const client = createFlightClient({
+  url: "http://localhost:50051",
+  auth: { type: "bearer", token: "your-token" }
+})
+
+// List available flights
+for await (const info of client.listFlights()) {
+  console.log(info.flightDescriptor?.path)
+}
+
+// Fetch data
+const flightInfo = await client.getFlightInfo({ type: "path", path: ["my", "dataset"] })
+const ticket = flightInfo.endpoint[0].ticket
+const table = await decodeFlightDataToTable(client.doGet(ticket))
+
+console.log(`Received ${table.numRows} rows`)
+
+client.close()
+```
+
+## Usage
+
 ### FlightClient (Core Flight RPC)
 
 ```ts
@@ -95,9 +120,9 @@ const tables = await client.getTables({})
 client.close()
 ```
 
-## Authentication
+### Authentication
 
-### Bearer Token
+#### Bearer Token
 
 ```ts
 const client = createFlightClient({
@@ -106,7 +131,7 @@ const client = createFlightClient({
 })
 ```
 
-### Basic Auth (Flight Handshake)
+#### Basic Auth (Flight Handshake)
 
 ```ts
 const client = createFlightClient({
@@ -121,7 +146,7 @@ const client = createFlightClient({
 await client.authenticate()
 ```
 
-### mTLS
+#### mTLS
 
 ```ts
 import { readFileSync } from "node:fs"
@@ -136,7 +161,7 @@ const client = createFlightClient({
 })
 ```
 
-## Arrow IPC Utilities
+### Arrow IPC Utilities
 
 ```ts
 import {
@@ -164,7 +189,7 @@ for await (const batch of decodeFlightDataStream(flightDataStream)) {
 }
 ```
 
-## Error Handling
+### Error Handling
 
 ```ts
 import {
@@ -192,20 +217,27 @@ try {
 }
 ```
 
-## API Documentation
+## API Reference
 
-Full API documentation is available in the [docs](docs/) directory. Generate locally with:
+Full API documentation is generated with [TypeDoc](https://typedoc.org/):
 
 ```bash
 bun run docs
+# Output in docs/
 ```
 
 ## Examples
 
-See the [examples](examples/) directory for runnable examples:
+See the [`examples/`](examples/) directory for runnable examples:
 
-- [flight-client.ts](examples/flight-client.ts) — FlightClient operations
-- [flight-sql-client.ts](examples/flight-sql-client.ts) — FlightSqlClient SQL operations
+| Example                                                 | Description                    |
+| ------------------------------------------------------- | ------------------------------ |
+| [`flight-client.ts`](examples/flight-client.ts)         | FlightClient operations        |
+| [`flight-sql-client.ts`](examples/flight-sql-client.ts) | FlightSqlClient SQL operations |
+
+```bash
+bun run examples/flight-client.ts
+```
 
 ## Development
 
@@ -228,9 +260,9 @@ bun run build
 ### Testing
 
 ```bash
-bun test              # Unit tests
-bun test:integration  # Integration tests (requires Flight server)
-bun test:coverage     # Coverage report
+bun run test              # unit tests
+bun run test:integration  # integration tests (requires Flight server)
+bun run test:coverage     # with coverage report
 ```
 
 ### Linting & Formatting
