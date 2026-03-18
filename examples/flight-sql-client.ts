@@ -1,33 +1,26 @@
-/* eslint-disable no-console */
 /**
- * FlightSqlClient usage example.
+ * FlightSqlClient example.
  *
- * This example demonstrates Arrow Flight SQL operations:
- * - Creating a client with authentication
- * - Executing SQL queries
- * - Streaming large result sets
- * - Using prepared statements
- * - Managing transactions
- * - Querying database metadata
+ * Demonstrates Arrow Flight SQL operations: executing queries, streaming
+ * large result sets, prepared statements, transactions, and database metadata.
  *
- * Run with: bun run examples/flight-sql-client.ts
+ * Requires a running Arrow Flight SQL server.
+ * Set `FLIGHT_HOST`, `FLIGHT_PORT`, `FLIGHT_TLS`, and `FLIGHT_BEARER_TOKEN`
+ * to configure the connection.
  *
- * Configure the server connection via environment variables:
- * - FLIGHT_HOST: Host address (default: localhost)
- * - FLIGHT_PORT: Port number (default: 50051)
- * - FLIGHT_TLS: Enable TLS (default: false)
- * - FLIGHT_BEARER_TOKEN: Bearer token for auth (optional)
+ * @example
+ * ```bash
+ * bun run examples/flight-sql-client.ts
+ * ```
  */
+
+/* eslint-disable no-console */
 
 import {
   createFlightSqlClient,
   FlightConnectionError,
   FlightError
 } from "@qualithm/arrow-flight-client"
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Configuration
-// ─────────────────────────────────────────────────────────────────────────────
 
 const host = process.env.FLIGHT_HOST ?? "localhost"
 const port = parseInt(process.env.FLIGHT_PORT ?? "50051", 10)
@@ -36,10 +29,6 @@ const bearerToken = process.env.FLIGHT_BEARER_TOKEN
 
 const url = `${tls ? "https" : "http"}://${host}:${String(port)}`
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Example: Creating a Client
-// ─────────────────────────────────────────────────────────────────────────────
-
 const client = createFlightSqlClient({
   url,
   auth: bearerToken !== undefined ? { type: "bearer", token: bearerToken } : undefined
@@ -47,12 +36,9 @@ const client = createFlightSqlClient({
 
 console.log(`Connected to: ${url}`)
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Example: Simple Query
-// ─────────────────────────────────────────────────────────────────────────────
-
+// Execute a simple query and print results.
 async function simpleQuery(): Promise<void> {
-  console.log("\n=== Simple Query ===")
+  console.log("--- Simple query ---")
 
   try {
     const table = await client.query("SELECT 1 AS value, 'hello' AS message")
@@ -73,12 +59,9 @@ async function simpleQuery(): Promise<void> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Example: Streaming Results (requires database with data)
-// ─────────────────────────────────────────────────────────────────────────────
-
-export async function streamingQuery(): Promise<void> {
-  console.log("\n=== Streaming Query ===")
+// Stream large result sets in batches.
+async function streamingQuery(): Promise<void> {
+  console.log("\n--- Streaming query ---")
 
   try {
     // Use queryBatches for large result sets to avoid loading all data into memory
@@ -97,12 +80,9 @@ export async function streamingQuery(): Promise<void> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Example: Prepared Statements (requires database)
-// ─────────────────────────────────────────────────────────────────────────────
-
-export async function preparedStatement(): Promise<void> {
-  console.log("\n=== Prepared Statement ===")
+// Prepare and execute a reusable statement.
+async function preparedStatement(): Promise<void> {
+  console.log("\n--- Prepared statement ---")
 
   try {
     // Prepare a statement for reuse
@@ -123,12 +103,9 @@ export async function preparedStatement(): Promise<void> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Example: Transactions (requires database with write support)
-// ─────────────────────────────────────────────────────────────────────────────
-
-export async function transaction(): Promise<void> {
-  console.log("\n=== Transaction ===")
+// Execute statements within an atomic transaction.
+async function transaction(): Promise<void> {
+  console.log("\n--- Transaction ---")
 
   try {
     // Begin a transaction
@@ -163,12 +140,9 @@ export async function transaction(): Promise<void> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Example: Database Metadata
-// ─────────────────────────────────────────────────────────────────────────────
-
+// Retrieve database catalogues, schemas, and tables.
 async function databaseMetadata(): Promise<void> {
-  console.log("\n=== Database Metadata ===")
+  console.log("\n--- Database metadata ---")
 
   try {
     // List catalogues
@@ -203,12 +177,9 @@ async function databaseMetadata(): Promise<void> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Example: Execute Update (requires database with write support)
-// ─────────────────────────────────────────────────────────────────────────────
-
-export async function executeUpdate(): Promise<void> {
-  console.log("\n=== Execute Update ===")
+// Execute INSERT, UPDATE, and DELETE statements.
+async function executeUpdate(): Promise<void> {
+  console.log("\n--- Execute update ---")
 
   try {
     // INSERT
@@ -231,10 +202,7 @@ export async function executeUpdate(): Promise<void> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Error Handling
-// ─────────────────────────────────────────────────────────────────────────────
-
+// Handle flight errors with type narrowing.
 function handleError(error: unknown): void {
   if (FlightConnectionError.isError(error)) {
     console.error(`connection error: ${error.message}`)
@@ -245,22 +213,19 @@ function handleError(error: unknown): void {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Main
-// ─────────────────────────────────────────────────────────────────────────────
-
 async function main(): Promise<void> {
+  console.log("=== Flight SQL Client ===\n")
   try {
     await simpleQuery()
     await databaseMetadata()
-    // These require a real database - uncomment when testing against a server:
-    // await streamingQuery()
-    // await preparedStatement()
-    // await transaction()
-    // await executeUpdate()
+    await streamingQuery()
+    await preparedStatement()
+    await transaction()
+    await executeUpdate()
   } finally {
     client.close()
   }
+  console.log("\nDone.")
 }
 
 main().catch(console.error)

@@ -1,22 +1,20 @@
-/* eslint-disable no-console */
 /**
- * FlightClient usage example.
+ * FlightClient example.
  *
- * This example demonstrates basic Arrow Flight operations:
- * - Creating a client with authentication
- * - Listing available flights
- * - Retrieving flight metadata
- * - Fetching data with doGet
- * - Uploading data with doPut
+ * Demonstrates basic Arrow Flight operations: listing flights, retrieving
+ * metadata, fetching data with doGet, and uploading data with doPut.
  *
- * Run with: bun run examples/flight-client.ts
+ * Requires a running Arrow Flight server.
+ * Set `FLIGHT_HOST`, `FLIGHT_PORT`, `FLIGHT_TLS`, and `FLIGHT_BEARER_TOKEN`
+ * to configure the connection.
  *
- * Configure the server connection via environment variables:
- * - FLIGHT_HOST: Host address (default: localhost)
- * - FLIGHT_PORT: Port number (default: 50051)
- * - FLIGHT_TLS: Enable TLS (default: false)
- * - FLIGHT_BEARER_TOKEN: Bearer token for auth (optional)
+ * @example
+ * ```bash
+ * bun run examples/flight-client.ts
+ * ```
  */
+
+/* eslint-disable no-console */
 
 import {
   createFlightClient,
@@ -28,20 +26,12 @@ import {
 } from "@qualithm/arrow-flight-client"
 import { tableFromArrays } from "apache-arrow"
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Configuration
-// ─────────────────────────────────────────────────────────────────────────────
-
 const host = process.env.FLIGHT_HOST ?? "localhost"
 const port = parseInt(process.env.FLIGHT_PORT ?? "50051", 10)
 const tls = process.env.FLIGHT_TLS === "true"
 const bearerToken = process.env.FLIGHT_BEARER_TOKEN
 
 const url = `${tls ? "https" : "http"}://${host}:${String(port)}`
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Example: Creating a Client
-// ─────────────────────────────────────────────────────────────────────────────
 
 const client = createFlightClient({
   url,
@@ -51,12 +41,9 @@ const client = createFlightClient({
 
 console.log(`Connected to: ${url}`)
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Example: Listing Flights
-// ─────────────────────────────────────────────────────────────────────────────
-
+// List all available flights on the server.
 async function listFlights(): Promise<void> {
-  console.log("\n=== Listing Flights ===")
+  console.log("--- Listing flights ---")
 
   try {
     for await (const info of client.listFlights()) {
@@ -70,12 +57,9 @@ async function listFlights(): Promise<void> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Example: Getting Flight Info
-// ─────────────────────────────────────────────────────────────────────────────
-
+// Retrieve metadata for a specific flight.
 async function getFlightInfo(): Promise<void> {
-  console.log("\n=== Getting Flight Info ===")
+  console.log("\n--- Getting flight info ---")
 
   try {
     // Use a path descriptor to identify the flight
@@ -96,12 +80,9 @@ async function getFlightInfo(): Promise<void> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Example: Fetching Data with doGet
-// ─────────────────────────────────────────────────────────────────────────────
-
+// Fetch data using a ticket from flight info.
 async function fetchData(): Promise<void> {
-  console.log("\n=== Fetching Data ===")
+  console.log("\n--- Fetching data ---")
 
   try {
     // First, get flight info to obtain a ticket
@@ -136,12 +117,9 @@ async function fetchData(): Promise<void> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Example: Uploading Data with doPut
-// ─────────────────────────────────────────────────────────────────────────────
-
+// Upload an Arrow table to the server.
 async function uploadData(): Promise<void> {
-  console.log("\n=== Uploading Data ===")
+  console.log("\n--- Uploading data ---")
 
   try {
     // Create sample data using Apache Arrow
@@ -183,12 +161,9 @@ async function uploadData(): Promise<void> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Example: Listing Available Actions
-// ─────────────────────────────────────────────────────────────────────────────
-
+// List actions supported by the server.
 async function listActions(): Promise<void> {
-  console.log("\n=== Available Actions ===")
+  console.log("\n--- Available actions ---")
 
   try {
     for await (const action of client.listActions()) {
@@ -199,10 +174,7 @@ async function listActions(): Promise<void> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Error Handling
-// ─────────────────────────────────────────────────────────────────────────────
-
+// Handle flight errors with type narrowing.
 function handleError(error: unknown): void {
   if (FlightConnectionError.isError(error)) {
     console.error(`connection error: ${error.message}`)
@@ -213,11 +185,8 @@ function handleError(error: unknown): void {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Main
-// ─────────────────────────────────────────────────────────────────────────────
-
 async function main(): Promise<void> {
+  console.log("=== Flight Client ===\n")
   try {
     await listFlights()
     await listActions()
@@ -227,6 +196,7 @@ async function main(): Promise<void> {
   } finally {
     client.close()
   }
+  console.log("\nDone.")
 }
 
 main().catch(console.error)
