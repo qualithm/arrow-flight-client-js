@@ -6,7 +6,7 @@
     "declarationMap": true,
     "sourceMap": true,
     "target": "ES2023",
-    "lib": ["ES2023"],
+    "lib": ["ES2023", "DOM"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
