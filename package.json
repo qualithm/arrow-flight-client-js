@@ -1,6 +1,6 @@
 {
   "name": "@qualithm/arrow-flight-client",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Unified Arrow Flight and Flight SQL client for JavaScript and TypeScript runtimes.",
   "private": false,
   "type": "module",
