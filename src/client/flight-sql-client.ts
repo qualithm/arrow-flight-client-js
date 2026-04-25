@@ -279,7 +279,7 @@ export class FlightSqlClient {
     ) {
       this.#flight = optionsOrClient as FlightClient
     } else {
-      this.#flight = new FlightClient(optionsOrClient as FlightClientOptions)
+      this.#flight = new FlightClient(optionsOrClient)
     }
   }
 
