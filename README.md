@@ -244,6 +244,8 @@ bun run examples/flight-client.ts
 ### Prerequisites
 
 - [Bun](https://bun.sh/) (recommended), Node.js 20+, or [Deno](https://deno.land/)
+- [buf](https://buf.build/docs/installation) — required only to regenerate Protocol Buffers bindings
+  from `proto/` (`brew install bufbuild/buf/buf`)
 
 ### Setup
 
