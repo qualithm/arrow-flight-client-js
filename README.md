@@ -1,6 +1,6 @@
 # Arrow Flight Client
 
-[![CI](https://github.com/qualithm/arrow-flight-client-js/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/qualithm/arrow-flight-client-js/actions/workflows/ci.yaml)
+[![CI](https://github.com/qualithm/arrow-flight-client-js/actions/workflows/ci.yaml/badge.svg)](https://github.com/qualithm/arrow-flight-client-js/actions/workflows/ci.yaml)
 [![codecov](https://codecov.io/gh/qualithm/arrow-flight-client-js/graph/badge.svg)](https://codecov.io/gh/qualithm/arrow-flight-client-js)
 [![npm](https://img.shields.io/npm/v/@qualithm/arrow-flight-client)](https://www.npmjs.com/package/@qualithm/arrow-flight-client)
 
