@@ -27,7 +27,7 @@ export type TlsOptions = {
   passphrase?: string
 
   /**
-   * Whether to reject unauthorised certificates.
+   * Whether to reject unauthorized certificates.
    * @default true
    */
   rejectUnauthorized?: boolean
