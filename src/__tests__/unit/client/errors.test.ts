@@ -110,15 +110,15 @@ describe("FlightConnectionError", () => {
 
 describe("FlightAuthError", () => {
   it("creates error with message", () => {
-    const error = new FlightAuthError("unauthorised")
+    const error = new FlightAuthError("unauthorized")
 
-    expect(error.message).toBe("unauthorised")
+    expect(error.message).toBe("unauthorized")
     expect(error.name).toBe("FlightAuthError")
   })
 
   it("creates error with cause", () => {
     const cause = new Error("token expired")
-    const error = new FlightAuthError("unauthorised", cause)
+    const error = new FlightAuthError("unauthorized", cause)
 
     expect(error.cause).toBe(cause)
   })
