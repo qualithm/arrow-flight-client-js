@@ -140,14 +140,14 @@ async function transaction(): Promise<void> {
   }
 }
 
-// Retrieve database catalogues, schemas, and tables.
+// Retrieve database catalogs, schemas, and tables.
 async function databaseMetadata(): Promise<void> {
   console.log("\n--- Database metadata ---")
 
   try {
-    // List catalogues
+    // List catalogs
     const catalogs = await client.getCatalogs()
-    console.log(`Catalogues: ${String(catalogs.numRows)}`)
+    console.log(`Catalogs: ${String(catalogs.numRows)}`)
 
     // List schemas
     const schemas = await client.getDbSchemas({})

@@ -1509,7 +1509,7 @@ export declare const ActionCancelQueryRequestSchema: GenMessage<ActionCancelQuer
 
 /**
  *
- * The result of cancelling a query.
+ * The result of canceling a query.
  *
  * The result should be wrapped in a google.protobuf.Any message.
  *
