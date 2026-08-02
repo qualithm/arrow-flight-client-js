@@ -11,7 +11,7 @@ gRPC client support for Apache Arrow Flight and Flight SQL protocols.
 
 - **Flight RPC** — All core methods: listFlights, getFlightInfo, doGet, doPut, doAction, etc.
 - **Flight SQL** — SQL queries, prepared statements, transactions, and database metadata
-- **Authentication** — Bearer tokens, mTLS, and Flight Handshake (BasicAuth)
+- **Authentication** — Bearer tokens, mTLS, Flight Handshake (BasicAuth), and rotating credentials
 - **Arrow IPC** — Encode/decode Apache Arrow data for streaming transfers
 - **Multi-runtime** — Works with Bun, Node.js 20+, and Deno
 
@@ -145,6 +145,32 @@ const client = createFlightClient({
 // Authenticate (performs Flight Handshake RPC)
 await client.authenticate()
 ```
+
+#### Rotating Credentials
+
+For credentials that expire or rotate, supply an `authProvider` instead of a static `auth`. The
+client resolves credentials through it before the first request and again whenever the server
+rejects a call as unauthenticated, so a long-lived client picks up a rotation without being
+reconstructed.
+
+```ts
+const client = createFlightClient({
+  url: "https://flight-server:50051",
+  authProvider: async () => ({
+    type: "bearer",
+    token: await fetchFreshToken()
+  })
+})
+```
+
+The resolved credential is cached, so the provider is not consulted per request. A rejected call is
+retried once with fresh credentials; if it is rejected again the error is surfaced. Concurrent
+rejections share a single refresh.
+
+Two calls are not retried: `doPut`, because its input stream has already been partly consumed and
+cannot be replayed, and any server stream that had already delivered a message before the rejection,
+which would otherwise repeat its opening messages. Both surface `FlightAuthError` for the caller to
+retry.
 
 #### mTLS
 

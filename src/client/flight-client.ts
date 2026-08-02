@@ -18,6 +18,7 @@ import {
 } from "../gen/arrow/flight/Flight_pb.js"
 import { FlightAuthError, FlightConnectionError, FlightError, FlightServerError } from "./errors.js"
 import {
+  type AuthOptions,
   type FlightAction,
   type FlightClientOptions,
   type FlightCriteria,
@@ -51,6 +52,10 @@ export class FlightClient {
   #closed = false
   #authenticated = false
   #authToken: string | undefined
+  /** Credentials most recently resolved from `authProvider`, if configured. */
+  #currentAuth: AuthOptions | undefined
+  /** Coalesces concurrent refreshes so a burst of rejections triggers one handshake. */
+  #refreshInFlight: Promise<string | undefined> | undefined
 
   constructor(options: FlightClientOptions) {
     this.#options = resolveOptions(options)
@@ -109,10 +114,11 @@ export class FlightClient {
 
     // Use provided payload or build from basic auth credentials
     let handshakePayload = payload
-    if (!handshakePayload && this.#options.auth?.type === "basic") {
+    const auth = this.#effectiveAuth()
+    if (!handshakePayload && auth?.type === "basic") {
       const basicAuth = create(BasicAuthSchema, {
-        username: this.#options.auth.credentials.username,
-        password: this.#options.auth.credentials.password
+        username: auth.credentials.username,
+        password: auth.credentials.password
       })
       handshakePayload = toBinary(BasicAuthSchema, basicAuth)
     }
@@ -170,10 +176,18 @@ export class FlightClient {
    * For basic auth, this calls the Handshake RPC.
    * For bearer auth, no action is needed (token is sent in headers).
    *
+   * When an `authProvider` is configured, this re-resolves credentials through
+   * it, so callers who know a credential has rotated can adopt it eagerly
+   * rather than waiting for the server to reject a call.
+   *
    * @returns The authentication token (if applicable)
    */
   async authenticate(): Promise<string | undefined> {
     this.#assertOpen()
+
+    if (this.#options.authProvider !== undefined) {
+      return this.#refreshAuth()
+    }
 
     if (this.#options.auth?.type === "basic") {
       return this.handshake()
@@ -196,13 +210,11 @@ export class FlightClient {
    */
   async getFlightInfo(descriptor: FlightDescriptorInput): Promise<FlightInfo> {
     this.#assertOpen()
-    try {
-      return await this.#client.getFlightInfo(this.#toFlightDescriptor(descriptor), {
+    return this.#withReauth("getFlightInfo", async () =>
+      this.#client.getFlightInfo(this.#toFlightDescriptor(descriptor), {
         headers: this.#getRequestHeaders()
       })
-    } catch (error) {
-      throw this.#wrapError(error, "getFlightInfo")
-    }
+    )
   }
 
   /**
@@ -213,13 +225,11 @@ export class FlightClient {
    */
   async pollFlightInfo(descriptor: FlightDescriptorInput): Promise<PollInfo> {
     this.#assertOpen()
-    try {
-      return await this.#client.pollFlightInfo(this.#toFlightDescriptor(descriptor), {
+    return this.#withReauth("pollFlightInfo", async () =>
+      this.#client.pollFlightInfo(this.#toFlightDescriptor(descriptor), {
         headers: this.#getRequestHeaders()
       })
-    } catch (error) {
-      throw this.#wrapError(error, "pollFlightInfo")
-    }
+    )
   }
 
   /**
@@ -230,13 +240,11 @@ export class FlightClient {
    */
   async getSchema(descriptor: FlightDescriptorInput): Promise<SchemaResult> {
     this.#assertOpen()
-    try {
-      return await this.#client.getSchema(this.#toFlightDescriptor(descriptor), {
+    return this.#withReauth("getSchema", async () =>
+      this.#client.getSchema(this.#toFlightDescriptor(descriptor), {
         headers: this.#getRequestHeaders()
       })
-    } catch (error) {
-      throw this.#wrapError(error, "getSchema")
-    }
+    )
   }
 
   /**
@@ -247,17 +255,12 @@ export class FlightClient {
    */
   async *listFlights(criteria?: FlightCriteria): AsyncIterable<FlightInfo> {
     this.#assertOpen()
-    try {
-      const stream = this.#client.listFlights(
+    yield* this.#streamWithReauth("listFlights", () =>
+      this.#client.listFlights(
         { expression: criteria?.expression ?? new Uint8Array() },
         { headers: this.#getRequestHeaders() }
       )
-      for await (const info of stream) {
-        yield info
-      }
-    } catch (error) {
-      throw this.#wrapError(error, "listFlights")
-    }
+    )
   }
 
   /**
@@ -267,14 +270,9 @@ export class FlightClient {
    */
   async *listActions(): AsyncIterable<ActionType> {
     this.#assertOpen()
-    try {
-      const stream = this.#client.listActions({}, { headers: this.#getRequestHeaders() })
-      for await (const action of stream) {
-        yield action
-      }
-    } catch (error) {
-      throw this.#wrapError(error, "listActions")
-    }
+    yield* this.#streamWithReauth("listActions", () =>
+      this.#client.listActions({}, { headers: this.#getRequestHeaders() })
+    )
   }
 
   /**
@@ -285,17 +283,12 @@ export class FlightClient {
    */
   async *doAction(action: FlightAction): AsyncIterable<Result> {
     this.#assertOpen()
-    try {
-      const stream = this.#client.doAction(
+    yield* this.#streamWithReauth("doAction", () =>
+      this.#client.doAction(
         { type: action.type, body: action.body ?? new Uint8Array() },
         { headers: this.#getRequestHeaders() }
       )
-      for await (const result of stream) {
-        yield result
-      }
-    } catch (error) {
-      throw this.#wrapError(error, "doAction")
-    }
+    )
   }
 
   /**
@@ -321,16 +314,11 @@ export class FlightClient {
    */
   async *doGet(ticket: FlightTicket): AsyncIterable<FlightData> {
     this.#assertOpen()
-    try {
-      const stream = this.#client.doGet(ticket, {
+    yield* this.#streamWithReauth("doGet", () =>
+      this.#client.doGet(ticket, {
         headers: this.#getRequestHeaders()
       })
-      for await (const data of stream) {
-        yield data
-      }
-    } catch (error) {
-      throw this.#wrapError(error, "doGet")
-    }
+    )
   }
 
   /**
@@ -371,6 +359,9 @@ export class FlightClient {
    */
   async *doPut(data: AsyncIterable<FlightData>): AsyncIterable<PutResult> {
     this.#assertOpen()
+    // No re-auth retry here: the caller's stream has already been partly drained
+    // by the time a rejection arrives, and it cannot be replayed.
+    await this.#ensureAuth()
     try {
       const stream = this.#client.doPut(data, {
         headers: this.#getRequestHeaders()
@@ -431,12 +422,126 @@ export class FlightClient {
   #getRequestHeaders(): Record<string, string> {
     const headers: Record<string, string> = { ...this.#options.headers }
 
+    // A provider-resolved bearer token supersedes the one baked in at construction
+    const auth = this.#currentAuth
+    if (auth?.type === "bearer" && auth.token !== "") {
+      headers.Authorization = `Bearer ${auth.token}`
+    }
+
     // Add auth token if authenticated via handshake
     if (this.#authToken !== undefined && this.#authToken !== "") {
       headers.Authorization = `Bearer ${this.#authToken}`
     }
 
     return headers
+  }
+
+  /** The credentials in force: provider-resolved if available, else static config. */
+  #effectiveAuth(): AuthOptions | undefined {
+    return this.#currentAuth ?? this.#options.auth
+  }
+
+  /** Resolves credentials before the first request, so it isn't spent on a rejection. */
+  async #ensureAuth(): Promise<void> {
+    if (this.#options.authProvider === undefined || this.#currentAuth !== undefined) {
+      return
+    }
+    await this.#refreshAuth()
+  }
+
+  /** Re-resolves credentials through the provider, coalescing concurrent callers. */
+  async #refreshAuth(): Promise<string | undefined> {
+    if (this.#refreshInFlight === undefined) {
+      this.#refreshInFlight = this.#resolveFromProvider().finally(() => {
+        this.#refreshInFlight = undefined
+      })
+    }
+    return this.#refreshInFlight
+  }
+
+  /** Calls the provider and applies the credentials it returns. */
+  async #resolveFromProvider(): Promise<string | undefined> {
+    const provider = this.#options.authProvider
+    if (provider === undefined) {
+      return undefined
+    }
+
+    const auth = await provider()
+    this.#currentAuth = auth
+    this.#authToken = undefined
+    this.#authenticated = false
+
+    if (auth.type === "basic") {
+      return this.handshake()
+    }
+
+    if (auth.type === "bearer") {
+      this.#authenticated = true
+      return auth.token
+    }
+
+    return undefined
+  }
+
+  /** Whether a failed call is worth retrying with freshly resolved credentials. */
+  #canReauth(error: FlightError): boolean {
+    return this.#options.authProvider !== undefined && FlightAuthError.isError(error)
+  }
+
+  /** Runs a unary call, retrying once with fresh credentials if the server rejects it. */
+  async #withReauth<T>(operation: string, call: () => Promise<T>): Promise<T> {
+    await this.#ensureAuth()
+
+    try {
+      return await call()
+    } catch (error) {
+      const wrapped = this.#wrapError(error, operation)
+      if (!this.#canReauth(wrapped)) {
+        throw wrapped
+      }
+      await this.#refreshAuth()
+    }
+
+    try {
+      return await call()
+    } catch (error) {
+      throw this.#wrapError(error, operation)
+    }
+  }
+
+  /**
+   * Runs a server-streaming call, retrying once with fresh credentials if the
+   * server rejects it.
+   *
+   * Only retries when the rejection arrives before any message, since a
+   * consumer that has already seen part of a stream would otherwise see the
+   * opening messages twice.
+   */
+  async *#streamWithReauth<T>(operation: string, start: () => AsyncIterable<T>): AsyncIterable<T> {
+    await this.#ensureAuth()
+
+    let yielded = false
+    try {
+      for await (const item of start()) {
+        yielded = true
+        yield item
+      }
+      return
+    } catch (error) {
+      const wrapped = this.#wrapError(error, operation)
+      if (yielded || !this.#canReauth(wrapped)) {
+        throw wrapped
+      }
+      await this.#refreshAuth()
+    }
+
+    try {
+      for await (const item of start()) {
+        yield item
+      }
+    } catch (error) {
+      throw this.#wrapError(error, operation)
+    }
   }
 
   /** Wraps errors in appropriate FlightError subclasses based on error type. */
