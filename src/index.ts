@@ -39,6 +39,7 @@ export { DEFAULT_TIMEOUT_MS } from "./client/index.js"
 // Client types
 export type {
   AuthOptions,
+  AuthProvider,
   BasicAuthCredentials,
   DecodedFlightData,
   ExecuteQueryOptions,

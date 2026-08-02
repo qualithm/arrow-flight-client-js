@@ -36,6 +36,7 @@ export {
 // Types
 export type {
   AuthOptions,
+  AuthProvider,
   BasicAuthCredentials,
   FlightAction,
   FlightClientOptions,
