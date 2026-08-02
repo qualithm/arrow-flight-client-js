@@ -71,6 +71,19 @@ export type AuthOptions =
     }
 
 /**
+ * Resolves credentials on demand, so a client can adopt a rotated credential
+ * without being reconstructed.
+ *
+ * @remarks
+ * The client calls this before its first request and again whenever the server
+ * rejects a call as unauthenticated. Between those points the resolved
+ * credential is cached, so the provider is not consulted per request.
+ *
+ * @returns The credentials to authenticate with.
+ */
+export type AuthProvider = () => AuthOptions | Promise<AuthOptions>
+
+/**
  * Configuration options for creating a Flight client.
  */
 export type FlightClientOptions = {
@@ -102,6 +115,15 @@ export type FlightClientOptions = {
   auth?: AuthOptions
 
   /**
+   * Resolves credentials on demand, for credentials that rotate during the
+   * lifetime of the client.
+   *
+   * Takes precedence over `auth`, which is otherwise unaffected. When both are
+   * set, `auth` is ignored once the provider has resolved.
+   */
+  authProvider?: AuthProvider
+
+  /**
    * TLS options for mTLS authentication.
    * Passed to the underlying Node.js HTTP/2 client.
    */
@@ -118,7 +140,7 @@ export type FlightClientOptions = {
  * Resolved configuration with defaults applied.
  */
 export type ResolvedFlightClientOptions = Required<Pick<FlightClientOptions, "url" | "timeoutMs">> &
-  Pick<FlightClientOptions, "headers" | "auth" | "tls" | "nodeOptions">
+  Pick<FlightClientOptions, "headers" | "auth" | "authProvider" | "tls" | "nodeOptions">
 
 /**
  * Default timeout for Flight client requests (30 seconds).
@@ -143,6 +165,7 @@ export function resolveOptions(options: FlightClientOptions): ResolvedFlightClie
     headers,
     timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     auth: options.auth,
+    authProvider: options.authProvider,
     tls: options.tls,
     nodeOptions: options.nodeOptions
   }
