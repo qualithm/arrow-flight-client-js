@@ -898,4 +898,253 @@ describe("FlightClient", () => {
       )
     })
   })
+
+  describe("authProvider", () => {
+    const unauthenticated = (): Error =>
+      Object.assign(new Error("token expired"), { code: "UNAUTHENTICATED" })
+
+    const authHeaderOf = (mock: typeof mockGetFlightInfo, call: number): string | undefined =>
+      (mock.mock.calls[call]?.[1] as { headers: Record<string, string> } | undefined)?.headers
+        .Authorization
+
+    async function* failAfterFirst<T>(items: T[], error: Error): AsyncIterable<T> {
+      for (const item of items) {
+        yield await Promise.resolve(item)
+      }
+      throw error
+    }
+
+    it("resolves credentials before the first request", async () => {
+      const provider = vi.fn(() => ({ type: "bearer" as const, token: "first-token" }))
+      mockGetFlightInfo.mockResolvedValue({ flightDescriptor: {} })
+
+      const client = new FlightClient({ url: "http://localhost:8815", authProvider: provider })
+      await client.getFlightInfo({ type: "path", path: ["t"] })
+
+      expect(provider).toHaveBeenCalledTimes(1)
+      expect(authHeaderOf(mockGetFlightInfo, 0)).toBe("Bearer first-token")
+    })
+
+    it("does not consult the provider again while the credential holds", async () => {
+      const provider = vi.fn(() => ({ type: "bearer" as const, token: "cached" }))
+      mockGetFlightInfo.mockResolvedValue({ flightDescriptor: {} })
+
+      const client = new FlightClient({ url: "http://localhost:8815", authProvider: provider })
+      await client.getFlightInfo({ type: "path", path: ["a"] })
+      await client.getFlightInfo({ type: "path", path: ["b"] })
+      await client.getFlightInfo({ type: "path", path: ["c"] })
+
+      expect(provider).toHaveBeenCalledTimes(1)
+      expect(mockGetFlightInfo).toHaveBeenCalledTimes(3)
+    })
+
+    it("adopts a rotated credential on an existing client", async () => {
+      const provider = vi
+        .fn()
+        .mockReturnValueOnce({ type: "bearer", token: "stale" })
+        .mockReturnValueOnce({ type: "bearer", token: "rotated" })
+      mockGetFlightInfo
+        .mockRejectedValueOnce(unauthenticated())
+        .mockResolvedValue({ flightDescriptor: {} })
+
+      const client = new FlightClient({ url: "http://localhost:8815", authProvider: provider })
+      const info = await client.getFlightInfo({ type: "path", path: ["t"] })
+
+      expect(info).toEqual({ flightDescriptor: {} })
+      expect(mockGetFlightInfo).toHaveBeenCalledTimes(2)
+      expect(authHeaderOf(mockGetFlightInfo, 0)).toBe("Bearer stale")
+      expect(authHeaderOf(mockGetFlightInfo, 1)).toBe("Bearer rotated")
+    })
+
+    it("re-runs the handshake for basic credentials", async () => {
+      const provider = vi.fn(() => ({
+        type: "basic" as const,
+        credentials: { username: "u", password: "p" }
+      }))
+      mockHandshake
+        .mockReturnValueOnce(
+          asyncIterable([{ protocolVersion: 0n, payload: new TextEncoder().encode("session-1") }])
+        )
+        .mockReturnValueOnce(
+          asyncIterable([{ protocolVersion: 0n, payload: new TextEncoder().encode("session-2") }])
+        )
+      mockGetFlightInfo
+        .mockRejectedValueOnce(unauthenticated())
+        .mockResolvedValue({ flightDescriptor: {} })
+
+      const client = new FlightClient({ url: "http://localhost:8815", authProvider: provider })
+      await client.getFlightInfo({ type: "path", path: ["t"] })
+
+      expect(mockHandshake).toHaveBeenCalledTimes(2)
+      expect(authHeaderOf(mockGetFlightInfo, 0)).toBe("Bearer session-1")
+      expect(authHeaderOf(mockGetFlightInfo, 1)).toBe("Bearer session-2")
+    })
+
+    it("retries exactly once, then surfaces the rejection", async () => {
+      const provider = vi.fn(() => ({ type: "bearer" as const, token: "no-good" }))
+      mockGetFlightInfo.mockRejectedValue(unauthenticated())
+
+      const client = new FlightClient({ url: "http://localhost:8815", authProvider: provider })
+
+      await expect(client.getFlightInfo({ type: "path", path: ["t"] })).rejects.toThrow(
+        FlightAuthError
+      )
+      expect(mockGetFlightInfo).toHaveBeenCalledTimes(2)
+      expect(provider).toHaveBeenCalledTimes(2)
+    })
+
+    it("does not retry errors that are not auth failures", async () => {
+      const provider = vi.fn(() => ({ type: "bearer" as const, token: "fine" }))
+      mockGetFlightInfo.mockRejectedValue(Object.assign(new Error("boom"), { code: "UNAVAILABLE" }))
+
+      const client = new FlightClient({ url: "http://localhost:8815", authProvider: provider })
+
+      await expect(client.getFlightInfo({ type: "path", path: ["t"] })).rejects.toThrow(
+        FlightServerError
+      )
+      expect(mockGetFlightInfo).toHaveBeenCalledTimes(1)
+    })
+
+    it("does not retry when no provider is configured", async () => {
+      mockGetFlightInfo.mockRejectedValue(unauthenticated())
+
+      const client = new FlightClient({
+        url: "http://localhost:8815",
+        auth: { type: "bearer", token: "static" }
+      })
+
+      await expect(client.getFlightInfo({ type: "path", path: ["t"] })).rejects.toThrow(
+        FlightAuthError
+      )
+      expect(mockGetFlightInfo).toHaveBeenCalledTimes(1)
+    })
+
+    it("coalesces concurrent rejections into a single refresh", async () => {
+      const provider = vi.fn(() => ({ type: "bearer" as const, token: "shared" }))
+      mockGetFlightInfo
+        .mockRejectedValueOnce(unauthenticated())
+        .mockRejectedValueOnce(unauthenticated())
+        .mockResolvedValue({ flightDescriptor: {} })
+
+      const client = new FlightClient({ url: "http://localhost:8815", authProvider: provider })
+      await Promise.all([
+        client.getFlightInfo({ type: "path", path: ["a"] }),
+        client.getFlightInfo({ type: "path", path: ["b"] })
+      ])
+
+      // One eager resolve plus one shared refresh, not one refresh per rejection
+      expect(provider).toHaveBeenCalledTimes(2)
+    })
+
+    it("retries a stream rejected before its first message", async () => {
+      const provider = vi.fn(() => ({ type: "bearer" as const, token: "t" }))
+      mockListFlights
+        .mockImplementationOnce(() => {
+          throw unauthenticated()
+        })
+        .mockImplementation(() => asyncIterable([{ flightDescriptor: { path: ["a"] } }]))
+
+      const client = new FlightClient({ url: "http://localhost:8815", authProvider: provider })
+      const seen: unknown[] = []
+      for await (const info of client.listFlights()) {
+        seen.push(info)
+      }
+
+      expect(seen).toHaveLength(1)
+      expect(mockListFlights).toHaveBeenCalledTimes(2)
+    })
+
+    it("does not retry a stream that has already delivered messages", async () => {
+      const provider = vi.fn(() => ({ type: "bearer" as const, token: "t" }))
+      mockListFlights.mockImplementation(() =>
+        failAfterFirst([{ flightDescriptor: { path: ["a"] } }], unauthenticated())
+      )
+
+      const client = new FlightClient({ url: "http://localhost:8815", authProvider: provider })
+      const seen: unknown[] = []
+
+      await expect(async () => {
+        for await (const info of client.listFlights()) {
+          seen.push(info)
+        }
+      }).rejects.toThrow(FlightAuthError)
+
+      expect(seen).toHaveLength(1)
+      expect(mockListFlights).toHaveBeenCalledTimes(1)
+    })
+
+    it("does not retry doPut, whose input stream cannot be replayed", async () => {
+      const provider = vi.fn(() => ({ type: "bearer" as const, token: "t" }))
+      mockDoPut.mockImplementation(() => {
+        throw unauthenticated()
+      })
+
+      const client = new FlightClient({ url: "http://localhost:8815", authProvider: provider })
+
+      await expect(async () => {
+        for await (const _ of client.doPut(asyncIterable([]))) {
+          // drain
+        }
+      }).rejects.toThrow(FlightAuthError)
+
+      expect(mockDoPut).toHaveBeenCalledTimes(1)
+    })
+
+    it("re-resolves through the provider when authenticate is called", async () => {
+      const provider = vi
+        .fn()
+        .mockReturnValueOnce({ type: "bearer", token: "old" })
+        .mockReturnValueOnce({ type: "bearer", token: "new" })
+
+      const client = new FlightClient({ url: "http://localhost:8815", authProvider: provider })
+
+      expect(await client.authenticate()).toBe("old")
+      expect(await client.authenticate()).toBe("new")
+      expect(client.authenticated).toBe(true)
+    })
+
+    it("takes precedence over static auth", async () => {
+      const provider = vi.fn(() => ({ type: "bearer" as const, token: "from-provider" }))
+      mockGetFlightInfo.mockResolvedValue({ flightDescriptor: {} })
+
+      const client = new FlightClient({
+        url: "http://localhost:8815",
+        auth: { type: "bearer", token: "from-static" },
+        authProvider: provider
+      })
+      await client.getFlightInfo({ type: "path", path: ["t"] })
+
+      expect(authHeaderOf(mockGetFlightInfo, 0)).toBe("Bearer from-provider")
+    })
+
+    it("sends no credentials when the provider resolves to none", async () => {
+      const provider = vi.fn(() => ({ type: "none" as const }))
+      mockGetFlightInfo.mockResolvedValue({ flightDescriptor: {} })
+
+      const client = new FlightClient({ url: "http://localhost:8815", authProvider: provider })
+
+      expect(await client.authenticate()).toBeUndefined()
+      await client.getFlightInfo({ type: "path", path: ["t"] })
+
+      expect(authHeaderOf(mockGetFlightInfo, 0)).toBeUndefined()
+      expect(client.authenticated).toBe(false)
+    })
+
+    it("surfaces a stream rejection that survives the retry", async () => {
+      const provider = vi.fn(() => ({ type: "bearer" as const, token: "t" }))
+      mockListFlights.mockImplementation(() => {
+        throw unauthenticated()
+      })
+
+      const client = new FlightClient({ url: "http://localhost:8815", authProvider: provider })
+
+      await expect(async () => {
+        for await (const _ of client.listFlights()) {
+          // drain
+        }
+      }).rejects.toThrow(FlightAuthError)
+
+      expect(mockListFlights).toHaveBeenCalledTimes(2)
+    })
+  })
 })
