@@ -32,10 +32,15 @@ const mockCreateClient = vi.fn(() => ({
 
 const mockCreateGrpcTransport = vi.fn(() => ({}))
 
-// Mock the ConnectRPC modules to avoid network calls
-vi.mock("@connectrpc/connect", () => ({
-  createClient: mockCreateClient
-}))
+// Mock the ConnectRPC modules to avoid network calls. Everything except
+// `createClient` re-exports the real module, so the doubles below can use the
+// real ConnectError/Code — a fabricated `code: "UNAUTHENTICATED"` string never
+// matches the numeric enum a real rejection carries, which is how the re-auth
+// matcher regressed unnoticed.
+vi.mock("@connectrpc/connect", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>()
+  return { ...actual, createClient: mockCreateClient }
+})
 
 vi.mock("@connectrpc/connect-node", () => ({
   createGrpcTransport: mockCreateGrpcTransport
@@ -54,8 +59,11 @@ vi.mock("../../../gen/arrow/flight/Flight_pb.js", () => ({
   FlightDescriptorSchema: {}
 }))
 
-// Import after mocks are set up
+// Import after mocks are set up. Code/ConnectError come from the mocked module
+// (which re-exports the real ones); a static import would hoist above the mock
+// factories and hit their TDZ.
 const { FlightClient } = await import("../../../client/flight-client.js")
+const { Code, ConnectError } = await import("@connectrpc/connect")
 
 // Helper to create async iterables for testing
 async function* asyncIterable<T>(items: T[]): AsyncIterable<T> {
@@ -174,18 +182,15 @@ describe("FlightClient", () => {
       )
     })
 
-    it("wraps ConnectRPC errors as FlightServerError", async () => {
-      const connectError = Object.assign(new Error("not found"), {
-        code: "NOT_FOUND",
-        rawMessage: "Flight not found"
-      })
+    it("wraps ConnectRPC errors as FlightServerError with the wire code name", async () => {
+      const connectError = new ConnectError("not found", Code.NotFound)
       mockGetFlightInfo.mockRejectedValue(connectError)
 
       const client = new FlightClient({ url: "http://localhost:8815" })
 
-      await expect(client.getFlightInfo({ type: "path", path: ["test"] })).rejects.toThrow(
-        FlightServerError
-      )
+      const rejection = client.getFlightInfo({ type: "path", path: ["test"] })
+      await expect(rejection).rejects.toThrow(FlightServerError)
+      await expect(rejection).rejects.toMatchObject({ code: "not_found" })
     })
 
     it("wraps connection errors as FlightConnectionError", async () => {
@@ -765,9 +770,7 @@ describe("FlightClient", () => {
 
   describe("error handling for auth errors", () => {
     it("wraps UNAUTHENTICATED errors as FlightAuthError", async () => {
-      const authError = Object.assign(new Error("unauthenticated"), {
-        code: "UNAUTHENTICATED"
-      })
+      const authError = new ConnectError("invalid or expired token", Code.Unauthenticated)
       mockGetFlightInfo.mockRejectedValue(authError)
 
       const client = new FlightClient({ url: "http://localhost:8815" })
@@ -778,9 +781,7 @@ describe("FlightClient", () => {
     })
 
     it("wraps PERMISSION_DENIED errors as FlightAuthError", async () => {
-      const authError = Object.assign(new Error("permission denied"), {
-        code: "PERMISSION_DENIED"
-      })
+      const authError = new ConnectError("permission denied", Code.PermissionDenied)
       mockGetFlightInfo.mockRejectedValue(authError)
 
       const client = new FlightClient({ url: "http://localhost:8815" })
@@ -900,8 +901,9 @@ describe("FlightClient", () => {
   })
 
   describe("authProvider", () => {
-    const unauthenticated = (): Error =>
-      Object.assign(new Error("token expired"), { code: "UNAUTHENTICATED" })
+    // The real rejection shape: ConnectError carries the numeric Code enum.
+    const unauthenticated = (): InstanceType<typeof ConnectError> =>
+      new ConnectError("token expired", Code.Unauthenticated)
 
     const authHeaderOf = (mock: typeof mockGetFlightInfo, call: number): string | undefined =>
       (mock.mock.calls[call]?.[1] as { headers: Record<string, string> } | undefined)?.headers
@@ -995,7 +997,7 @@ describe("FlightClient", () => {
 
     it("does not retry errors that are not auth failures", async () => {
       const provider = vi.fn(() => ({ type: "bearer" as const, token: "fine" }))
-      mockGetFlightInfo.mockRejectedValue(Object.assign(new Error("boom"), { code: "UNAVAILABLE" }))
+      mockGetFlightInfo.mockRejectedValue(new ConnectError("boom", Code.Unavailable))
 
       const client = new FlightClient({ url: "http://localhost:8815", authProvider: provider })
 
