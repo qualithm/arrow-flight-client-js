@@ -1,5 +1,5 @@
 import { create, toBinary } from "@bufbuild/protobuf"
-import { type Client, createClient } from "@connectrpc/connect"
+import { type Client, Code, createClient } from "@connectrpc/connect"
 import { createGrpcTransport } from "@connectrpc/connect-node"
 
 import {
@@ -27,6 +27,23 @@ import {
   type ResolvedFlightClientOptions,
   resolveOptions
 } from "./types.js"
+
+/**
+ * Render a ConnectRPC error code as the canonical lowercase wire name
+ * (Code.NotFound → "not_found"), so FlightServerError.code stays readable now
+ * that ConnectError carries the numeric Code enum rather than a string.
+ */
+function connectCodeName(code: unknown): string {
+  if (typeof code === "number") {
+    const name = (Code as Record<number, string | undefined>)[code]
+    if (name !== undefined) {
+      return (
+        name[0].toLowerCase() + name.substring(1).replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)
+      )
+    }
+  }
+  return String(code)
+}
 
 /**
  * Low-level Arrow Flight client for communicating with Flight servers.
@@ -552,16 +569,22 @@ export class FlightClient {
 
     // Handle ConnectRPC errors
     if (error instanceof Error && "code" in error) {
-      const connectError = error as Error & { code: string; rawMessage?: string }
+      // ConnectError carries the numeric Code enum (Code.Unauthenticated is 16),
+      // never the uppercase name — comparing against "UNAUTHENTICATED" never
+      // matches and silently disables the auth-rejection re-handshake.
+      const connectError = error as Error & { code: unknown; rawMessage?: string }
 
       // Check for authentication-related errors
-      if (connectError.code === "UNAUTHENTICATED" || connectError.code === "PERMISSION_DENIED") {
+      if (
+        connectError.code === Code.Unauthenticated ||
+        connectError.code === Code.PermissionDenied
+      ) {
         return new FlightAuthError(`${operation} failed: ${connectError.message}`, error)
       }
 
       return new FlightServerError(
         `${operation} failed: ${connectError.message}`,
-        connectError.code,
+        connectCodeName(connectError.code),
         connectError.rawMessage,
         error
       )
