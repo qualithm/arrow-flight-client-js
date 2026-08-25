@@ -10,6 +10,7 @@
  */
 
 import {
+  Message,
   type RecordBatch,
   RecordBatchReader,
   RecordBatchStreamWriter,
@@ -173,9 +174,28 @@ export async function* encodeRecordBatchesToFlightData(
   // Get the complete IPC stream
   const ipcBytes = writer.toUint8Array(true)
 
-  if (ipcBytes.length > 0) {
-    // Yield the complete IPC stream as a single FlightData message
-    yield createFlightData(ipcBytes)
+  // The Flight wire contract requires the schema as its own first FlightData
+  // message and each record batch (or dictionary delta) as a discrete message.
+  // The IPC stream already holds them as separate messages — split at the
+  // message boundaries so the server decoder sees one logical message per
+  // FlightData rather than an unparseable concatenated blob.
+  let recordBatchMessages = 0
+  for (const messageBytes of splitIpcStreamMessages(ipcBytes)) {
+    const flightData = createFlightData(messageBytes)
+    if (flightData.dataHeader.length > 0 && Message.decode(flightData.dataHeader).isRecordBatch()) {
+      recordBatchMessages++
+    }
+    yield flightData
+  }
+
+  // `RecordBatchWriter.write` ignores a payload that is not `instanceof` its own
+  // copy of apache-arrow's RecordBatch, so a duplicate install silently encodes
+  // zero rows instead of failing. Catch that here rather than shipping an empty
+  // DoPut the server will accept as a no-op.
+  if (batchArray.length > 0 && recordBatchMessages === 0) {
+    throw new Error(
+      "encoded no record batches from a non-empty input: the RecordBatch objects came from a different copy of apache-arrow than this client uses. Ensure a single apache-arrow instance is installed"
+    )
   }
 }
 
@@ -308,6 +328,49 @@ export function parseIpcMessage(ipcBytes: Uint8Array): { header: Uint8Array; bod
   const body = bodyStart < ipcBytes.length ? ipcBytes.slice(bodyStart) : new Uint8Array()
 
   return { header, body }
+}
+
+/**
+ * Split a concatenated Arrow IPC stream into its individual messages.
+ *
+ * `RecordBatchStreamWriter.toUint8Array()` returns the schema and every batch
+ * as one buffer; each is a discrete `[continuation, metadata-size, metadata,
+ * body]` record. Flight requires one `FlightData` per message, so we walk the
+ * stream frame by frame: read the continuation marker and metadata size, decode
+ * the flatbuffer to learn the body length, and step past header + body. The
+ * zero-length end-of-stream marker terminates the walk and is not yielded.
+ *
+ * @internal Exported for testing purposes
+ * @param ipcBytes - The full IPC stream bytes
+ * @yields Each individual IPC message's bytes
+ */
+export function* splitIpcStreamMessages(ipcBytes: Uint8Array): Generator<Uint8Array> {
+  const CONTINUATION = 0xffffffff
+  const alignment = 8
+  const view = new DataView(ipcBytes.buffer, ipcBytes.byteOffset, ipcBytes.byteLength)
+
+  let offset = 0
+  while (offset + 8 <= ipcBytes.byteLength) {
+    if (view.getUint32(offset, true) !== CONTINUATION) {
+      break
+    }
+    const metadataSize = view.getInt32(offset + 4, true)
+    if (metadataSize <= 0) {
+      // End-of-stream marker.
+      break
+    }
+    const metadataPaddedSize = Math.ceil(metadataSize / alignment) * alignment
+    const headerStart = offset + 8
+    const bodyStart = headerStart + metadataPaddedSize
+
+    // The body length lives in the message's own flatbuffer header.
+    const message = Message.decode(ipcBytes.slice(headerStart, headerStart + metadataSize))
+    const { bodyLength } = message
+    const messageEnd = bodyStart + bodyLength
+
+    yield ipcBytes.slice(offset, messageEnd)
+    offset = messageEnd
+  }
 }
 
 /**

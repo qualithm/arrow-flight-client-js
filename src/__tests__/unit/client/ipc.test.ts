@@ -105,6 +105,41 @@ describe("IPC encoding/decoding utilities", () => {
       // Should produce at least schema message from IPC stream
       expect(flightDataMessages.length).toBeGreaterThanOrEqual(0)
     })
+
+    it("emits the schema as its own first FlightData message", async () => {
+      const table = createTestTable()
+
+      const messages: FlightData[] = []
+      for await (const data of encodeRecordBatchesToFlightData(table.batches, table.schema)) {
+        messages.push(data)
+      }
+
+      // The wire contract: one FlightData per IPC message (schema, then one per
+      // batch). A standards-compliant Flight server rejects a concatenated blob.
+      expect(messages.length).toBe(1 + table.batches.length)
+    })
+
+    it("produces messages a fresh RecordBatchReader can decode", async () => {
+      const table = createTestTable()
+
+      // Reassemble the emitted FlightData messages into an IPC stream and
+      // confirm each carries a decodable message (schema, then batches).
+      const messages: FlightData[] = []
+      for await (const data of encodeRecordBatchesToFlightData(table.batches, table.schema)) {
+        messages.push(data)
+      }
+
+      // The first message must be the schema: it has a header and no body.
+      expect(messages[0].dataHeader.length).toBeGreaterThan(0)
+
+      // Recombine and decode to prove the split didn't corrupt the stream.
+      const recombined: FlightData[] = messages
+      const decoded: RecordBatch[] = []
+      for await (const batch of decodeFlightDataStream(asyncIterable(recombined))) {
+        decoded.push(batch)
+      }
+      expect(decoded.length).toBe(table.batches.length)
+    })
   })
 
   describe("decodeFlightDataStream", () => {
@@ -349,20 +384,20 @@ describe("IPC edge cases", () => {
       flightData.push(fd)
     }
 
-    // Modify to have empty body (simulating metadata-only message)
-    const modifiedData: FlightData[] = flightData.map((fd) => ({
-      ...fd,
-      dataBody: new Uint8Array()
-    }))
+    // The schema message is legitimately header-only (a body-bearing batch
+    // stripped of its body is malformed, so we don't simulate that here).
+    // Feeding the schema message alone should not crash the decoder.
+    const schemaOnly = flightData.slice(0, 1)
 
     // Should handle gracefully (may not decode to batches but shouldn't throw)
     const batches: RecordBatch[] = []
-    for await (const batch of decodeFlightDataStream(asyncIterable(modifiedData))) {
+    for await (const batch of decodeFlightDataStream(asyncIterable(schemaOnly))) {
       batches.push(batch)
     }
 
-    // May or may not produce batches depending on the data, but shouldn't crash
-    expect(Array.isArray(batches)).toBe(true)
+    // A schema alone yields no real record batches (only an internal empty
+    // placeholder at most), and must not crash.
+    expect(batches.every((b) => b.numRows === 0)).toBe(true)
   })
 
   it("handles FlightData with minimal valid IPC header", async () => {
