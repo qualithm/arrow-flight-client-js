@@ -4,11 +4,13 @@
  * Requires a running Arrow Flight server with test fixtures.
  */
 import { create } from "@bufbuild/protobuf"
+import { tableFromArrays } from "apache-arrow"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
 import {
   createFlightClient,
   decodeFlightDataToTable,
+  encodeTableToFlightData,
   type FlightClient,
   type FlightDescriptorInput
 } from "../../client"
@@ -24,16 +26,39 @@ function pathDescriptor(...path: string[]): FlightDescriptorInput {
   return { type: "path", path }
 }
 
-describe("Data Operations Integration", () => {
+/** Attach a path FlightDescriptor to the first message of an encoded stream. */
+async function* withDescriptor(
+  stream: AsyncGenerator<FlightData>,
+  path: string[]
+): AsyncGenerator<FlightData> {
+  let first = true
+  for await (const data of stream) {
+    if (first) {
+      first = false
+      yield create(FlightDataSchema, {
+        flightDescriptor: {
+          type: FlightDescriptor_DescriptorType.PATH,
+          path,
+          cmd: new Uint8Array()
+        },
+        dataHeader: data.dataHeader,
+        dataBody: data.dataBody,
+        appMetadata: data.appMetadata
+      })
+    } else {
+      yield data
+    }
+  }
+}
+
+// Probed once at module load so the skip is explicit in the run summary
+// rather than a silent pass with zero assertions.
+const serverAvailable = await isFlightAvailable()
+
+describe.skipIf(!serverAvailable)("Data Operations Integration", () => {
   let client: FlightClient
-  let available: boolean
 
   beforeAll(async () => {
-    available = await isFlightAvailable()
-    if (!available) {
-      return
-    }
-
     client = createFlightClient({
       url: config.url,
       auth: {
@@ -45,17 +70,11 @@ describe("Data Operations Integration", () => {
   })
 
   afterAll(() => {
-    if (available) {
-      client.close()
-    }
+    client.close()
   })
 
   describe("doGet", () => {
     it("retrieves data for test/integers", async () => {
-      if (!available) {
-        return
-      }
-
       const descriptor = pathDescriptor(...config.flights.integers)
       const info = await client.getFlightInfo(descriptor)
 
@@ -78,10 +97,6 @@ describe("Data Operations Integration", () => {
     })
 
     it("retrieves data for test/strings", async () => {
-      if (!available) {
-        return
-      }
-
       const descriptor = pathDescriptor(...config.flights.strings)
       const info = await client.getFlightInfo(descriptor)
 
@@ -93,10 +108,6 @@ describe("Data Operations Integration", () => {
     })
 
     it("returns empty result for test/empty", async () => {
-      if (!available) {
-        return
-      }
-
       const descriptor = pathDescriptor(...config.flights.empty)
       const info = await client.getFlightInfo(descriptor)
 
@@ -106,10 +117,6 @@ describe("Data Operations Integration", () => {
     })
 
     it("retrieves large dataset", async () => {
-      if (!available) {
-        return
-      }
-
       const descriptor = pathDescriptor(...config.flights.large)
       const info = await client.getFlightInfo(descriptor)
 
@@ -119,10 +126,6 @@ describe("Data Operations Integration", () => {
     })
 
     it("retrieves nested types", async () => {
-      if (!available) {
-        return
-      }
-
       const descriptor = pathDescriptor(...config.flights.nested)
       const info = await client.getFlightInfo(descriptor)
 
@@ -135,57 +138,37 @@ describe("Data Operations Integration", () => {
   })
 
   describe("doPut", () => {
-    it("uploads data and receives acknowledgement", async () => {
-      if (!available) {
-        return
-      }
+    // Exercise the public encode path end to end: build a Table, encode with
+    // encodeTableToFlightData (where the #212 wire-format bugs lived), upload,
+    // then read back and assert the exact rows. A string column covers the
+    // dictionary-encoded batch path.
+    it("round-trips an encoded Table through doPut and doGet", async () => {
+      const ids = [1, 2, 3, 4, 5]
+      const names = ["alpha", "beta", "gamma", "delta", "epsilon"]
+      const table = tableFromArrays({ id: ids, name: names })
+      expect(table.numRows).toBe(5)
 
-      // First, get schema from an existing flight to use as template
-      const descriptor = pathDescriptor(...config.flights.integers)
-      const info = await client.getFlightInfo(descriptor)
+      const path = ["test", `put-test-${String(Date.now())}`]
 
-      // Get the original data
-      const sourceChunks: FlightData[] = []
-      for await (const data of client.doGet(info.endpoint[0].ticket!)) {
-        sourceChunks.push(data)
-      }
-
-      // Upload to a new path
-      const putDescriptor: FlightDescriptorInput = {
-        type: "path",
-        path: ["test", `put-test-${String(Date.now())}`]
-      }
-
-      // Create FlightData stream with descriptor
-      async function* createPutStream(): AsyncGenerator<FlightData> {
-        for (let i = 0; i < sourceChunks.length; i++) {
-          const data = await Promise.resolve(sourceChunks[i])
-          if (i === 0) {
-            // First message includes descriptor - use create() for proper proto message
-            yield create(FlightDataSchema, {
-              flightDescriptor: {
-                type: FlightDescriptor_DescriptorType.PATH,
-                path: putDescriptor.type === "path" ? putDescriptor.path : [],
-                cmd: new Uint8Array()
-              },
-              dataHeader: data.dataHeader,
-              dataBody: data.dataBody,
-              appMetadata: data.appMetadata
-            })
-          } else {
-            yield data
-          }
-        }
-      }
-
-      // Collect acknowledgements
       const acks: unknown[] = []
-      for await (const result of client.doPut(createPutStream())) {
+      for await (const result of client.doPut(
+        withDescriptor(encodeTableToFlightData(table), path)
+      )) {
         acks.push(result)
       }
+      expect(acks.length).toBeGreaterThan(0)
 
-      // Should receive acknowledgements (server-dependent)
-      expect(Array.isArray(acks)).toBe(true)
+      const readBack = await decodeFlightDataToTable(
+        client.doGet((await client.getFlightInfo(pathDescriptor(...path))).endpoint[0].ticket!)
+      )
+
+      expect(readBack.numRows).toBe(5)
+      expect(readBack.schema.fields.map((f) => f.name)).toEqual(["id", "name"])
+
+      const readIds = readBack.getChild("id")?.toArray()
+      const readNames = readBack.getChild("name")?.toArray()
+      expect([...readIds]).toEqual(ids)
+      expect([...readNames].map(String)).toEqual(names)
     })
   })
 })
