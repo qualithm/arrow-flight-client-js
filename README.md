@@ -40,7 +40,8 @@ for await (const info of client.listFlights()) {
 
 // Fetch data
 const flightInfo = await client.getFlightInfo({ type: "path", path: ["my", "dataset"] })
-const ticket = flightInfo.endpoint[0].ticket
+const ticket = flightInfo.endpoint[0]?.ticket
+if (ticket === undefined) throw new Error("flight has no ticket")
 const table = await decodeFlightDataToTable(client.doGet(ticket))
 
 console.log(`Received ${table.numRows} rows`)
@@ -68,7 +69,8 @@ for await (const info of client.listFlights()) {
 
 // Fetch data
 const flightInfo = await client.getFlightInfo({ type: "path", path: ["my", "dataset"] })
-const ticket = flightInfo.endpoint[0].ticket
+const ticket = flightInfo.endpoint[0]?.ticket
+if (ticket === undefined) throw new Error("flight has no ticket")
 const table = await decodeFlightDataToTable(client.doGet(ticket))
 
 console.log(`Received ${table.numRows} rows`)
@@ -207,10 +209,10 @@ const table = tableFromArrays({
 const flightData = encodeTableToFlightData(table)
 
 // Decode a stream
-const receivedTable = await decodeFlightDataToTable(flightDataStream)
+const receivedTable = await decodeFlightDataToTable(flightData)
 
 // Stream batches
-for await (const batch of decodeFlightDataStream(flightDataStream)) {
+for await (const batch of decodeFlightDataStream(encodeTableToFlightData(table))) {
   console.log(`Batch: ${batch.numRows} rows`)
 }
 ```

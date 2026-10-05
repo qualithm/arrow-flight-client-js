@@ -2,10 +2,7 @@ import { FlightClient } from "./flight-client.js"
 import type { FlightClientOptions } from "./types.js"
 
 /**
- * Factory function to create a FlightClient.
- *
- * This is the recommended way to create a Flight client as it provides
- * a cleaner API and better tree-shaking support.
+ * Create a FlightClient.
  *
  * @example
  * ```ts
