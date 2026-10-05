@@ -982,6 +982,49 @@ describe("FlightClient", () => {
       expect(authHeaderOf(mockGetFlightInfo, 1)).toBe("Bearer session-2")
     })
 
+    it("keeps the previous session token on requests sent during a refresh", async () => {
+      const provider = vi.fn(() => ({
+        type: "basic" as const,
+        credentials: { username: "u", password: "p" }
+      }))
+      let finishHandshake: () => void = () => undefined
+      const handshakeGate = new Promise<void>((resolve) => {
+        finishHandshake = resolve
+      })
+      async function* gatedSession(): AsyncIterable<{
+        protocolVersion: bigint
+        payload: Uint8Array
+      }> {
+        await handshakeGate
+        yield { protocolVersion: 0n, payload: new TextEncoder().encode("session-2") }
+      }
+      mockHandshake
+        .mockReturnValueOnce(
+          asyncIterable([{ protocolVersion: 0n, payload: new TextEncoder().encode("session-1") }])
+        )
+        .mockImplementationOnce(gatedSession)
+      mockGetFlightInfo.mockResolvedValue({ flightDescriptor: {} })
+
+      const client = new FlightClient({ url: "http://localhost:8815", authProvider: provider })
+      await client.getFlightInfo({ type: "path", path: ["a"] })
+
+      const refresh = client.authenticate()
+      await vi.waitFor(() => {
+        expect(mockHandshake).toHaveBeenCalledTimes(2)
+      })
+      await client.getFlightInfo({ type: "path", path: ["b"] })
+      finishHandshake()
+      await refresh
+      await client.getFlightInfo({ type: "path", path: ["c"] })
+
+      expect(authHeaderOf(mockGetFlightInfo, 1)).toBe("Bearer session-1")
+      expect(authHeaderOf(mockGetFlightInfo, 2)).toBe("Bearer session-2")
+      const refreshHeaders = (
+        mockHandshake.mock.calls[1]?.[1] as { headers: Record<string, string> }
+      ).headers
+      expect(refreshHeaders.Authorization).toBeUndefined()
+    })
+
     it("retries exactly once, then surfaces the rejection", async () => {
       const provider = vi.fn(() => ({ type: "bearer" as const, token: "no-good" }))
       mockGetFlightInfo.mockRejectedValue(unauthenticated())
