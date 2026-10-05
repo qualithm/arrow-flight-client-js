@@ -159,8 +159,9 @@ export class FlightClient {
         })
       }
 
+      // The session token is what this handshake replaces, so never present it
       const stream = this.#client.handshake(requests(), {
-        headers: this.#getRequestHeaders()
+        headers: this.#getRequestHeaders({ includeSessionToken: false })
       })
 
       let response: HandshakeResponse | undefined
@@ -436,7 +437,7 @@ export class FlightClient {
   }
 
   /** Returns headers for requests, including auth token if authenticated. */
-  #getRequestHeaders(): Record<string, string> {
+  #getRequestHeaders({ includeSessionToken = true } = {}): Record<string, string> {
     const headers: Record<string, string> = { ...this.#options.headers }
 
     // A provider-resolved bearer token supersedes the one baked in at construction
@@ -446,7 +447,7 @@ export class FlightClient {
     }
 
     // Add auth token if authenticated via handshake
-    if (this.#authToken !== undefined && this.#authToken !== "") {
+    if (includeSessionToken && this.#authToken !== undefined && this.#authToken !== "") {
       headers.Authorization = `Bearer ${this.#authToken}`
     }
 
@@ -485,18 +486,21 @@ export class FlightClient {
 
     const auth = await provider()
     this.#currentAuth = auth
-    this.#authToken = undefined
-    this.#authenticated = false
 
+    // Requests sent while the handshake runs keep the previous session token;
+    // clearing it first would send them with no credentials at all
     if (auth.type === "basic") {
       return this.handshake()
     }
+
+    this.#authToken = undefined
 
     if (auth.type === "bearer") {
       this.#authenticated = true
       return auth.token
     }
 
+    this.#authenticated = false
     return undefined
   }
 
