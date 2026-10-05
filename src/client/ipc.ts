@@ -4,9 +4,6 @@
  * Flight uses Arrow IPC format to transfer data. FlightData messages contain:
  * - `dataHeader`: Arrow IPC message header (schema or record batch header)
  * - `dataBody`: Arrow IPC message body (data buffers)
- *
- * This module provides utilities to decode FlightData streams into Arrow
- * RecordBatches and Tables, and to encode RecordBatches for upload.
  */
 
 import {
@@ -58,7 +55,7 @@ export type DecodedFlightData =
  *
  * @example
  * ```ts
- * const stream = client.doGetFlightData(ticket)
+ * const stream = client.doGet(ticket)
  * for await (const batch of decodeFlightDataStream(stream)) {
  *   console.log(`Received batch with ${batch.numRows} rows`)
  * }
@@ -113,7 +110,7 @@ export async function* decodeFlightDataStream<T extends TypeMap = TypeMap>(
  *
  * @example
  * ```ts
- * const stream = client.doGetFlightData(ticket)
+ * const stream = client.doGet(ticket)
  * const table = await decodeFlightDataToTable(stream)
  * console.log(`Received table with ${table.numRows} rows`)
  * ```
@@ -149,7 +146,9 @@ export async function decodeFlightDataToTable<T extends TypeMap = TypeMap>(
  * ```ts
  * const batches = [recordBatch1, recordBatch2]
  * const flightData = encodeRecordBatchesToFlightData(batches, schema)
- * await client.doPut(descriptor, flightData)
+ * for await (const result of client.doPut(flightData)) {
+ *   console.log(result.appMetadata)
+ * }
  * ```
  */
 export async function* encodeRecordBatchesToFlightData(
@@ -377,7 +376,7 @@ export function* splitIpcStreamMessages(ipcBytes: Uint8Array): Generator<Uint8Ar
  * Get the schema from a FlightData stream.
  *
  * Decodes the stream to extract the schema from the first record batch.
- * Note: This consumes the stream.
+ * Consumes the stream.
  *
  * @param stream - Async iterable of FlightData messages
  * @returns The Arrow Schema from the stream
