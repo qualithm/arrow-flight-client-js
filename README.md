@@ -51,34 +51,6 @@ client.close()
 
 ## Usage
 
-### FlightClient (Core Flight RPC)
-
-```ts
-import { createFlightClient, decodeFlightDataToTable } from "@qualithm/arrow-flight-client"
-
-// Create a client
-const client = createFlightClient({
-  url: "http://localhost:50051",
-  auth: { type: "bearer", token: "your-token" }
-})
-
-// List available flights
-for await (const info of client.listFlights()) {
-  console.log(info.flightDescriptor?.path)
-}
-
-// Fetch data
-const flightInfo = await client.getFlightInfo({ type: "path", path: ["my", "dataset"] })
-const ticket = flightInfo.endpoint[0]?.ticket
-if (ticket === undefined) throw new Error("flight has no ticket")
-const table = await decodeFlightDataToTable(client.doGet(ticket))
-
-console.log(`Received ${table.numRows} rows`)
-
-// Clean up
-client.close()
-```
-
 ### FlightSqlClient (SQL Operations)
 
 ```ts
