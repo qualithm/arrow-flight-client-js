@@ -16,6 +16,7 @@ export {
   FlightAuthError,
   FlightCancelledError,
   FlightConnectionError,
+  FlightDecodeError,
   FlightError,
   FlightServerError,
   FlightTimeoutError
