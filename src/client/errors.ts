@@ -118,3 +118,18 @@ export class FlightCancelledError extends FlightError {
     return error instanceof FlightCancelledError
   }
 }
+
+/**
+ * Error thrown when the bytes in a Flight data stream are not valid Arrow IPC.
+ */
+export class FlightDecodeError extends FlightError {
+  /** Error name for identification. */
+  override readonly name: string = "FlightDecodeError"
+
+  /**
+   * Type guard to check if an error is a FlightDecodeError.
+   */
+  static override isError(error: unknown): error is FlightDecodeError {
+    return error instanceof FlightDecodeError
+  }
+}
