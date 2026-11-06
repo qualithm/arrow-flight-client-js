@@ -18,6 +18,7 @@ import {
 
 import type { FlightData } from "../gen/arrow/flight/Flight_pb.js"
 import { FlightDecodeError } from "./errors.js"
+import { checkIpcHeader } from "./ipc-bounds.js"
 
 /**
  * Result of decoding a single FlightData message.
@@ -74,6 +75,8 @@ export async function* decodeFlightDataStream<T extends TypeMap = TypeMap>(
     if (data.dataHeader.length === 0 && data.dataBody.length === 0) {
       continue
     }
+
+    checkIpcHeader(data.dataHeader, data.dataBody)
 
     // Reconstruct the IPC message by concatenating header and body
     // Arrow IPC streaming format: [continuation, metadata_size, metadata, body]
