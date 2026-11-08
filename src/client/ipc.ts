@@ -17,6 +17,8 @@ import {
 } from "apache-arrow"
 
 import type { FlightData } from "../gen/arrow/flight/Flight_pb.js"
+import { FlightDecodeError } from "./errors.js"
+import { checkIpcHeader } from "./ipc-bounds.js"
 
 /**
  * Result of decoding a single FlightData message.
@@ -52,6 +54,7 @@ export type DecodedFlightData =
  *
  * @param stream - Async iterable of FlightData messages
  * @yields RecordBatch objects
+ * @throws {FlightDecodeError} When the stream's bytes are not valid Arrow IPC
  *
  * @example
  * ```ts
@@ -73,6 +76,8 @@ export async function* decodeFlightDataStream<T extends TypeMap = TypeMap>(
       continue
     }
 
+    checkIpcHeader(data.dataHeader, data.dataBody)
+
     // Reconstruct the IPC message by concatenating header and body
     // Arrow IPC streaming format: [continuation, metadata_size, metadata, body]
     const ipcMessage = createIpcMessage(data.dataHeader, data.dataBody)
@@ -92,11 +97,14 @@ export async function* decodeFlightDataStream<T extends TypeMap = TypeMap>(
     offset += chunk.length
   }
 
-  // Use RecordBatchReader to decode the IPC stream
-  const reader = RecordBatchReader.from<T>(combined)
-
-  for await (const batch of reader) {
-    yield batch
+  // Use RecordBatchReader to decode the IPC stream. The source stream was
+  // drained above, so anything thrown here is the bytes failing to decode.
+  try {
+    for await (const batch of RecordBatchReader.from<T>(combined)) {
+      yield batch
+    }
+  } catch (error) {
+    throw new FlightDecodeError("flight data is not valid arrow ipc", error)
   }
 }
 

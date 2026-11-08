@@ -4,6 +4,7 @@ import {
   FlightAuthError,
   FlightCancelledError,
   FlightConnectionError,
+  FlightDecodeError,
   FlightError,
   FlightServerError,
   FlightTimeoutError
@@ -258,5 +259,18 @@ describe("FlightCancelledError", () => {
       expect(FlightCancelledError.isError(new FlightError("test"))).toBe(false)
       expect(FlightCancelledError.isError(new FlightTimeoutError("test", 1000))).toBe(false)
     })
+  })
+})
+
+describe("FlightDecodeError", () => {
+  it("carries its message and cause and is a FlightError", () => {
+    const cause = new Error("bad bytes")
+    const error = new FlightDecodeError("flight data is not valid arrow ipc", cause)
+
+    expect(error.name).toBe("FlightDecodeError")
+    expect(error.cause).toBe(cause)
+    expect(FlightDecodeError.isError(error)).toBe(true)
+    expect(FlightError.isError(error)).toBe(true)
+    expect(FlightDecodeError.isError(new FlightError("other"))).toBe(false)
   })
 })
